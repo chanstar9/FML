@@ -1,0 +1,7 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea/
+
+# Data set
+*.csv
+*.h5
+*.xlsx
