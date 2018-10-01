@@ -75,11 +75,11 @@ def get_kosdaq():
     return data
 
 
-data_sets = OrderedDict({
+data_sets = {
     ALL: get_all(),
     KOSPI: get_kospi(),
     KOSDAQ: get_kosdaq(),
-})
+}
 
 activations = {
     LINEAR: linear,
