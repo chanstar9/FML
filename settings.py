@@ -7,6 +7,7 @@ import pandas as pd
 from keras.activations import linear, tanh, relu
 from keras.initializers import Zeros, lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
 from keras.regularizers import l1, l2, l1_l2
+from collections import OrderedDict
 
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
@@ -19,7 +20,7 @@ HIDDEN_LAYER = 'hidden_layer'
 DROPOUT = 'dropout'
 DROPOUT_RATE = 'dropout_rate'
 
-# DATA_SET_NAME
+# DATA_SET
 ALL = 'all'
 KOSPI = 'kospi'
 KOSDAQ = 'kosdaq'
@@ -74,11 +75,11 @@ def get_kosdaq():
     return data
 
 
-data_sets = {
+data_sets = OrderedDict({
     ALL: get_all(),
     KOSPI: get_kospi(),
     KOSDAQ: get_kosdaq(),
-}
+})
 
 activations = {
     LINEAR: linear,
@@ -87,7 +88,6 @@ activations = {
 }
 
 initializers = {
-    ZEROS: Zeros(),
     LECUN_NORMAL: lecun_normal(),
     LECUN_UNIFORM: lecun_uniform(),
     HE_NORMAL: he_normal(),

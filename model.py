@@ -24,9 +24,9 @@ result_columns = [RET_1]
 
 def get_train_test_set(data_set, test_month):
     test_index = months.index(test_month)
-    assert test_index - 132 >= 0, "test_month is too early"
+    assert test_index - 12 - 36 >= 0, "test_month is too early"
 
-    train_start_month = months[test_index - 120]
+    train_start_month = months[test_index - 36]
 
     training_set = data_set.loc[(data_set[DATE] >= train_start_month) & (data_set[DATE] < test_month), :]
     test_set = data_set.loc[data_set[DATE] == test_month, :]
@@ -67,7 +67,8 @@ def train_model(month, param):
                     activation=activation,
                     bias_initializer=bias_initializer,
                     kernel_initializer=kernel_initializer,
-                    bias_regularizer=bias_regularizer))
+                    bias_regularizer=bias_regularizer
+                    ))
     model.add(BatchNormalization())
     if dropout:
         model.add(Dropout(dropout_rate))
@@ -111,15 +112,21 @@ def get_results(model, X, actual_y):
     CORR, _ = spearmanr(df_prediction[actual_rank], df_prediction[predict_rank])
 
     top_tertile_return = df_prediction.loc[df_prediction[predict_rank] > 0.6666 * len(df_prediction), RET_1].mean()
+    assert pd.notna(top_tertile_return)
     bottom_tertile_return = df_prediction.loc[df_prediction[predict_rank] < 0.3333 * len(df_prediction), RET_1].mean()
+    assert pd.notna(bottom_tertile_return)
     long_short_tertile_return = top_tertile_return - bottom_tertile_return
+    assert pd.notna(long_short_tertile_return)
 
     top_quintile_return = df_prediction.loc[df_prediction[predict_rank] > 0.8 * len(df_prediction), RET_1].mean()
+    assert pd.notna(top_quintile_return)
     bottom_quintile_return = df_prediction.loc[df_prediction[predict_rank] < 0.2 * len(df_prediction), RET_1].mean()
+    assert pd.notna(bottom_quintile_return)
     long_short_quintile_return = top_quintile_return - bottom_quintile_return
+    assert pd.notna(long_short_quintile_return)
 
-    return MSE, RMSE, CORR, long_short_tertile_return, top_tertile_return, bottom_tertile_return, \
-           long_short_quintile_return, top_quintile_return, bottom_quintile_return
+    return MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
+           top_quintile_return, long_short_quintile_return, bottom_quintile_return
 
 
 def get_file_name(param) -> str:
@@ -135,7 +142,7 @@ def get_file_name(param) -> str:
     return file_name
 
 
-def simulate(param):
+def simulate(param, case_number):
     file_name = get_file_name(param)
 
     test_pf = pf.loc[pf[DATE] >= '2012-05-31', :]
@@ -152,8 +159,8 @@ def simulate(param):
     for month in tqdm(test_months):
         model, X_train, actual_train, X_test, actual_test = train_model(month, param)
 
-        MSE, RMSE, CORR, long_short_tertile_return, top_tertile_return, bottom_tertile_return, \
-        long_short_quintile_return, top_quintile_return, bottom_quintile_return = get_results(model, X_test,
+        MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
+        top_quintile_return, long_short_quintile_return, bottom_quintile_return = get_results(model, X_test,
                                                                                               actual_test)
 
         MSE_list.append(MSE)
@@ -171,12 +178,13 @@ def simulate(param):
         'MSE': MSE_list,
         'RMSE': RMSE_list,
         'CORR': CORR_list,
-        'long_short_tertile_return': long_short_tertile_return_list,
         'top_tertile_return': top_tertile_return_list,
+        'long_short_tertile_return': long_short_tertile_return_list,
         'bottom_tertile_return': bottom_tertile_return_list,
-        'long_short_quintile_return': long_short_quintile_return_list,
         'top_quintile_return': top_quintile_return_list,
+        'long_short_quintile_return': long_short_quintile_return_list,
         'bottom_quintile_return': bottom_quintile_return_list,
     })
 
-    df_result.to_csv('result/{}.csv'.format(file_name), index=False)
+    df_result.to_csv('result/{case_number}_{file_name}.csv'.format(case_number=case_number, file_name=file_name),
+                     index=False)
