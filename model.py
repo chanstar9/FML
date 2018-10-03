@@ -16,7 +16,7 @@ from tqdm import tqdm
 from settings import *
 
 pf = Portfolio()
-pf = pf.loc[pf[DATE] <= '2018-08-31', :]
+pf = pf.loc[pf[DATE] <= '2018-07-31', :]
 months = sorted(pf[DATE].unique())
 
 result_columns = [RET_1]
