@@ -28,7 +28,7 @@ for data_set in sorted(data_sets.keys()):
                         })
 
 if __name__ == '__main__':
-    case_number = 0
+    case_number = 2687
     print('Case: {}'.format(case_number))
     print('Param: {}'.format(params[case_number]))
     simulate(param=params[case_number], case_number=case_number)
