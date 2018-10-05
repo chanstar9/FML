@@ -17,7 +17,7 @@ for data_set in sorted(data_sets.keys()):
                         params.append({
                             DATA_SET: data_set,
                             BATCH_SIZE: 300,
-                            EPOCHS: 100,
+                            EPOCHS: 10,
                             ACTIVATION: activation,
                             BIAS_INITIALIZER: bias_initializer,
                             KERNEL_INITIALIZER: kernel_initializer,
@@ -28,7 +28,7 @@ for data_set in sorted(data_sets.keys()):
                         })
 
 if __name__ == '__main__':
-    case_number = 2687
+    case_number = 0
     print('Case: {}'.format(case_number))
     print('Param: {}'.format(params[case_number]))
     simulate(param=params[case_number], case_number=case_number)

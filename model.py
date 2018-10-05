@@ -46,7 +46,6 @@ def train_model(month, param):
     y_train = data_train_array[:, 2:3]
     X_test = data_test_array[:, 3:]
     y_test = data_test_array[:, 2:3]
-    actual_train = data_train.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
     input_dim = X_train.shape[1]
@@ -92,7 +91,7 @@ def train_model(month, param):
               verbose=0,
               validation_data=(X_test, y_test))
 
-    return model, X_train, actual_train, X_test, actual_test
+    return model, X_test, actual_test
 
 
 def get_results(model, X, actual_y):
@@ -101,7 +100,10 @@ def get_results(model, X, actual_y):
     predict_rank = 'predict_rank'
 
     prediction = model.predict(X, verbose=0)
-    df_prediction = pd.concat([actual_y, pd.DataFrame(prediction, columns=[predict_ret_1])], axis=1)
+    df_prediction = pd.concat(
+        [actual_y,
+         pd.DataFrame(prediction, columns=[predict_ret_1])],
+        axis=1)
     df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
     df_prediction[actual_rank] = df_prediction[RET_1].rank()
     df_prediction[predict_rank] = df_prediction[predict_ret_1].rank()
@@ -125,7 +127,7 @@ def get_results(model, X, actual_y):
     long_short_quintile_return = top_quintile_return - bottom_quintile_return
     assert pd.notna(long_short_quintile_return)
 
-    return MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
+    return df_prediction, MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
            top_quintile_return, long_short_quintile_return, bottom_quintile_return
 
 
@@ -147,6 +149,8 @@ def simulate(param, case_number):
 
     test_pf = pf.loc[pf[DATE] >= '2012-05-31', :]
     test_months = sorted(test_pf[DATE].unique())
+
+    df_predictions = pd.DataFrame()
     MSE_list = []
     RMSE_list = []
     CORR_list = []
@@ -157,12 +161,14 @@ def simulate(param, case_number):
     top_quintile_return_list = []
     bottom_quintile_return_list = []
     for month in tqdm(test_months):
-        model, X_train, actual_train, X_test, actual_test = train_model(month, param)
+        model, X_test, actual_test = train_model(month, param)
 
-        MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
-        top_quintile_return, long_short_quintile_return, bottom_quintile_return = get_results(model, X_test,
-                                                                                              actual_test)
+        df_prediction, MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
+        top_quintile_return, long_short_quintile_return, bottom_quintile_return = get_results(
+            model, X_test, actual_test
+        )
 
+        df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
         MSE_list.append(MSE)
         RMSE_list.append(RMSE)
         CORR_list.append(CORR)
@@ -186,5 +192,7 @@ def simulate(param, case_number):
         'bottom_quintile_return': bottom_quintile_return_list,
     })
 
+    df_predictions.to_csv(
+        'prediction/{case_number}_{file_name}.csv'.format(case_number=case_number, file_name=file_name), index=False)
     df_result.to_csv('result/{case_number}_{file_name}.csv'.format(case_number=case_number, file_name=file_name),
                      index=False)
