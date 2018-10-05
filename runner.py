@@ -17,7 +17,7 @@ for data_set in sorted(data_sets.keys()):
                         params.append({
                             DATA_SET: data_set,
                             BATCH_SIZE: 300,
-                            EPOCHS: 10,
+                            EPOCHS: 100,
                             ACTIVATION: activation,
                             BIAS_INITIALIZER: bias_initializer,
                             KERNEL_INITIALIZER: kernel_initializer,
