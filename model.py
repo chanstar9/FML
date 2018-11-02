@@ -15,28 +15,36 @@ from tqdm import tqdm
 
 from settings import *
 
+START_DATE = '2012-05-31'
+
+USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
+TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
+
 pf = Portfolio()
-pf = pf.loc[pf[DATE] <= '2018-07-31', :]
-months = sorted(pf[DATE].unique())
+months = sorted(pf[DATE].unique())[:-1]
 
 result_columns = [RET_1]
 
 
-def get_train_test_set(data_set, test_month):
+def get_train_test_set(training_set_key, test_set_key, test_month):
+    training_set = get_data_set(training_set_key)
+    test_set = get_data_set(test_set_key)
+
     test_index = months.index(test_month)
-    assert test_index - 12 - 36 >= 0, "test_month is too early"
+    assert test_index - USED_PAST_MONTHS - TRAINING_MONTHS >= 0, "test_month is too early"
 
-    train_start_month = months[test_index - 36]
+    train_start_month = months[test_index - TRAINING_MONTHS]
 
-    training_set = data_set.loc[(data_set[DATE] >= train_start_month) & (data_set[DATE] < test_month), :]
-    test_set = data_set.loc[data_set[DATE] == test_month, :]
+    training_set = training_set.loc[(training_set[DATE] >= train_start_month) & (training_set[DATE] < test_month), :]
+    test_set = test_set.loc[test_set[DATE] == test_month, :]
 
     return training_set, test_set
 
 
 def train_model(month, param):
     tf.reset_default_graph()
-    data_train, data_test = get_train_test_set(data_set=get_data_set(param[DATA_SET]), test_month=month)
+    data_train, data_test = get_train_test_set(training_set_key=param[TRAINING_SET],
+                                               test_set_key=param[TEST_SET], test_month=month)
 
     # Make data a numpy array
     data_train_array = data_train.values
@@ -113,28 +121,21 @@ def get_results(model, X, actual_y):
 
     CORR, _ = spearmanr(df_prediction[actual_rank], df_prediction[predict_rank])
 
-    top_tertile_return = df_prediction.loc[df_prediction[predict_rank] > 0.6666 * len(df_prediction), RET_1].mean()
-    assert pd.notna(top_tertile_return)
-    bottom_tertile_return = df_prediction.loc[df_prediction[predict_rank] < 0.3333 * len(df_prediction), RET_1].mean()
-    assert pd.notna(bottom_tertile_return)
-    long_short_tertile_return = top_tertile_return - bottom_tertile_return
-    assert pd.notna(long_short_tertile_return)
+    decile_returns = [df_prediction.loc[df_prediction[predict_rank] <= 0.1 * len(df_prediction), RET_1].mean()]
+    for criteria in range(1, 10):
+        decile_returns.append(df_prediction.loc[
+                                  (df_prediction[predict_rank] > criteria / 10 * len(df_prediction)) &
+                                  (df_prediction[predict_rank] <= (criteria + 1) * 10 * len(df_prediction)),
+                                  RET_1].mean())
 
-    top_quintile_return = df_prediction.loc[df_prediction[predict_rank] > 0.8 * len(df_prediction), RET_1].mean()
-    assert pd.notna(top_quintile_return)
-    bottom_quintile_return = df_prediction.loc[df_prediction[predict_rank] < 0.2 * len(df_prediction), RET_1].mean()
-    assert pd.notna(bottom_quintile_return)
-    long_short_quintile_return = top_quintile_return - bottom_quintile_return
-    assert pd.notna(long_short_quintile_return)
-
-    return df_prediction, MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
-           top_quintile_return, long_short_quintile_return, bottom_quintile_return
+    return df_prediction, MSE, RMSE, CORR, decile_returns
 
 
 def get_file_name(param) -> str:
-    file_name = '{hidden_layer}({data_set}_{activation}_{bias_initializer}_{kernel_initializer}_{bias_regularizer})'.format(
+    file_name = '{hidden_layer}-{training_set}-{test_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
         hidden_layer=param[HIDDEN_LAYER],
-        data_set=param[DATA_SET],
+        training_set=param[TRAINING_SET],
+        test_set=param[TEST_SET],
         activation=param[ACTIVATION],
         bias_initializer=param[BIAS_INITIALIZER],
         kernel_initializer=param[KERNEL_INITIALIZER],
@@ -147,24 +148,18 @@ def get_file_name(param) -> str:
 def simulate(param, case_number):
     file_name = get_file_name(param)
 
-    test_pf = pf.loc[pf[DATE] >= '2012-05-31', :]
-    test_months = sorted(test_pf[DATE].unique())
+    test_pf = pf.loc[pf[DATE] >= START_DATE, :]
+    test_months = sorted(test_pf[DATE].unique())[:-1]
 
     df_predictions = pd.DataFrame()
     MSE_list = []
     RMSE_list = []
     CORR_list = []
-    long_short_tertile_return_list = []
-    top_tertile_return_list = []
-    bottom_tertile_return_list = []
-    long_short_quintile_return_list = []
-    top_quintile_return_list = []
-    bottom_quintile_return_list = []
+    decile_returns_list = []
     for month in tqdm(test_months):
         model, X_test, actual_test = train_model(month, param)
 
-        df_prediction, MSE, RMSE, CORR, top_tertile_return, long_short_tertile_return, bottom_tertile_return, \
-        top_quintile_return, long_short_quintile_return, bottom_quintile_return = get_results(
+        df_prediction, MSE, RMSE, CORR, decile_returns = get_results(
             model, X_test, actual_test
         )
 
@@ -172,27 +167,20 @@ def simulate(param, case_number):
         MSE_list.append(MSE)
         RMSE_list.append(RMSE)
         CORR_list.append(CORR)
-        long_short_tertile_return_list.append(long_short_tertile_return)
-        top_tertile_return_list.append(top_tertile_return)
-        bottom_tertile_return_list.append(bottom_tertile_return)
-        long_short_quintile_return_list.append(long_short_quintile_return)
-        top_quintile_return_list.append(top_quintile_return)
-        bottom_quintile_return_list.append(bottom_quintile_return)
+        decile_returns_list.append(decile_returns)
 
-    df_result = pd.DataFrame(data={
+    decile_returns_list = np.array(decile_returns_list)
+    result_data = {
         DATE: test_months,
         'MSE': MSE_list,
         'RMSE': RMSE_list,
-        'CORR': CORR_list,
-        'top_tertile_return': top_tertile_return_list,
-        'long_short_tertile_return': long_short_tertile_return_list,
-        'bottom_tertile_return': bottom_tertile_return_list,
-        'top_quintile_return': top_quintile_return_list,
-        'long_short_quintile_return': long_short_quintile_return_list,
-        'bottom_quintile_return': bottom_quintile_return_list,
-    })
+        'CORR': CORR_list
+    }
+    for index in range(0, 10):
+        result_data[index + 1] = decile_returns_list[:, index]
+    df_result = pd.DataFrame(data=result_data)
 
     df_predictions.to_csv(
-        'prediction/{case_number}_{file_name}.csv'.format(case_number=case_number, file_name=file_name), index=False)
-    df_result.to_csv('result/{case_number}_{file_name}.csv'.format(case_number=case_number, file_name=file_name),
+        'prediction/{case_number}-{file_name}.csv'.format(case_number=case_number, file_name=file_name), index=False)
+    df_result.to_csv('result/{case_number}-{file_name}.csv'.format(case_number=case_number, file_name=file_name),
                      index=False)

@@ -5,11 +5,11 @@
 """
 import pandas as pd
 from keras.activations import linear, tanh, relu
-from keras.initializers import Zeros, lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
+from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
 from keras.regularizers import l1, l2, l1_l2
-from collections import OrderedDict
 
-DATA_SET = 'data_set'
+TRAINING_SET = 'training_set'
+TEST_SET = 'test_set'
 BATCH_SIZE = 'batch_size'
 EPOCHS = 'epochs'
 ACTIVATION = 'activation'
@@ -60,25 +60,15 @@ DNN8_3 = 'DNN8_3'
 DNN8_4 = 'DNN8_4'
 
 
-def get_all():
-    data = pd.read_csv('data/all.csv', parse_dates=['date'])
-    return data
-
-
-def get_kospi():
-    data = None
-    return data
-
-
-def get_kosdaq():
-    data = None
+def get_data(data_name):
+    data = pd.read_csv('data/{}.csv'.format(data_name), parse_dates=['date'])
     return data
 
 
 data_sets = {
-    ALL: get_all(),
-    KOSPI: get_kospi(),
-    KOSDAQ: get_kosdaq(),
+    ALL: get_data(ALL),
+    KOSPI: get_data(KOSPI),
+    KOSDAQ: get_data(KOSDAQ),
 }
 
 activations = {

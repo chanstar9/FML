@@ -15,7 +15,8 @@ for data_set in sorted(data_sets.keys()):
                 for bias_regularizer in sorted(regularizers.keys()):
                     for hidden_layer in sorted(hidden_layers.keys()):
                         params.append({
-                            DATA_SET: data_set,
+                            TRAINING_SET: data_set,
+                            TEST_SET: data_set,
                             BATCH_SIZE: 300,
                             EPOCHS: 100,
                             ACTIVATION: activation,
@@ -28,7 +29,20 @@ for data_set in sorted(data_sets.keys()):
                         })
 
 if __name__ == '__main__':
-    case_number = 0
-    print('Case: {}'.format(case_number))
-    print('Param: {}'.format(params[case_number]))
-    simulate(param=params[case_number], case_number=case_number)
+    # case_number = 0
+    # print('Case: {}'.format(case_number))
+    # print('Param: {}'.format(params[case_number]))
+    # simulate(param=params[case_number], case_number=case_number)
+    simulate(param={
+        TRAINING_SET: ALL,
+        TEST_SET: ALL,
+        BATCH_SIZE: 300,
+        EPOCHS: 100,
+        ACTIVATION: LINEAR,
+        BIAS_INITIALIZER: HE_UNIFORM,
+        KERNEL_INITIALIZER: GLOROT_UNIFORM,
+        BIAS_REGULARIZER: NONE,
+        HIDDEN_LAYER: NN3_3,
+        DROPOUT: False,
+        DROPOUT_RATE: 0.5
+    }, case_number=0)
