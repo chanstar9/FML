@@ -159,6 +159,11 @@ def simulate(param, case_number):
     for month in tqdm(test_months):
         model, X_test, actual_test = train_model(month, param)
 
+        for idx_1, layer in enumerate(model.layers):
+            weights = layer.get_weights()
+            for idx_2, weight in enumerate(weights):
+                pd.DataFrame(weight).to_csv('weight/{}_{}_{}.csv'.format(month, idx_1, idx_2))
+
         df_prediction, MSE, RMSE, CORR, decile_returns = get_results(
             model, X_test, actual_test
         )
