@@ -45,4 +45,4 @@ if __name__ == '__main__':
         HIDDEN_LAYER: NN3_3,
         DROPOUT: False,
         DROPOUT_RATE: 0.5
-    }, case_number=150)
+    }, case_number=0)
