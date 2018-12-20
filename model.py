@@ -10,13 +10,19 @@ from keras.models import Sequential
 from ksif import Portfolio
 from ksif.core.columns import *
 from tqdm import tqdm
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 
 from settings import *
+from data_generator import START_DATE
 
-START_DATE = '2007-04-30'
 
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
+
+TRAIN_START_DATE = (
+        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
+).strftime('%Y-%m-%d')
 
 pf = Portfolio()
 months = sorted(pf[DATE].unique())[:-1]
@@ -134,7 +140,7 @@ def get_file_name(param) -> str:
 def simulate(param, case_number):
     file_name = get_file_name(param)
 
-    test_pf = pf.loc[pf[DATE] >= START_DATE, :]
+    test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
     test_months = sorted(test_pf[DATE].unique())[:-1]
 
     df_predictions = pd.DataFrame()

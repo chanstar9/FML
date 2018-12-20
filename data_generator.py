@@ -8,6 +8,8 @@ from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
 
+START_DATE = '2007-04-30'
+
 scaler = MinMaxScaler()
 
 
@@ -61,8 +63,10 @@ if __name__ == '__main__':
 
     columns.extend(rolling_columns)
 
-    all_portfolio = Portfolio(start_date='2004-05-31')
+    all_portfolio = Portfolio(start_date=START_DATE)
+    # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/all.csv', index=False)
