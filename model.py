@@ -138,6 +138,7 @@ def get_file_name(param) -> str:
 
 
 def simulate(param, case_number):
+    print("Case number: {}".format(case_number))
     file_name = get_file_name(param)
 
     test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
