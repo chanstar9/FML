@@ -67,8 +67,6 @@ def get_data(data_name):
 
 data_sets = {
     ALL: get_data(ALL),
-    KOSPI: get_data(KOSPI),
-    KOSDAQ: get_data(KOSDAQ),
 }
 
 activations = {

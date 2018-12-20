@@ -4,18 +4,16 @@
 :Date: 2018-09-23
 """
 import keras
-import numpy as np
 import tensorflow as tf
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
 from ksif import Portfolio
 from ksif.core.columns import *
-from scipy.stats import spearmanr
 from tqdm import tqdm
 
 from settings import *
 
-START_DATE = '2012-05-31'
+START_DATE = '2007-04-30'
 
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
@@ -102,7 +100,7 @@ def train_model(month, param):
     return model, X_test, actual_test
 
 
-def get_results(model, X, actual_y):
+def get_predictions(model, X, actual_y):
     predict_ret_1 = 'predict_' + RET_1
     actual_rank = 'actual_rank'
     predict_rank = 'predict_rank'
@@ -116,19 +114,7 @@ def get_results(model, X, actual_y):
     df_prediction[actual_rank] = df_prediction[RET_1].rank()
     df_prediction[predict_rank] = df_prediction[predict_ret_1].rank()
 
-    MSE = (df_prediction['diff'] ** 2).mean()
-    RMSE = np.sqrt(MSE)
-
-    CORR, _ = spearmanr(df_prediction[actual_rank], df_prediction[predict_rank])
-
-    decile_returns = [df_prediction.loc[df_prediction[predict_rank] <= 0.1 * len(df_prediction), RET_1].mean()]
-    for criteria in range(1, 10):
-        decile_returns.append(df_prediction.loc[
-                                  (df_prediction[predict_rank] > criteria / 10 * len(df_prediction)) &
-                                  (df_prediction[predict_rank] <= (criteria + 1) * 10 * len(df_prediction)),
-                                  RET_1].mean())
-
-    return df_prediction, MSE, RMSE, CORR, decile_returns
+    return df_prediction
 
 
 def get_file_name(param) -> str:
@@ -152,40 +138,12 @@ def simulate(param, case_number):
     test_months = sorted(test_pf[DATE].unique())[:-1]
 
     df_predictions = pd.DataFrame()
-    MSE_list = []
-    RMSE_list = []
-    CORR_list = []
-    decile_returns_list = []
     for month in tqdm(test_months):
         model, X_test, actual_test = train_model(month, param)
 
-        for idx_1, layer in enumerate(model.layers):
-            weights = layer.get_weights()
-            for idx_2, weight in enumerate(weights):
-                pd.DataFrame(weight).to_csv('weight/{}_{}_{}.csv'.format(month, idx_1, idx_2))
-
-        df_prediction, MSE, RMSE, CORR, decile_returns = get_results(
-            model, X_test, actual_test
-        )
+        df_prediction = get_predictions(model, X_test, actual_test)
 
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
-        MSE_list.append(MSE)
-        RMSE_list.append(RMSE)
-        CORR_list.append(CORR)
-        decile_returns_list.append(decile_returns)
-
-    decile_returns_list = np.array(decile_returns_list)
-    result_data = {
-        DATE: test_months,
-        'MSE': MSE_list,
-        'RMSE': RMSE_list,
-        'CORR': CORR_list
-    }
-    for index in range(0, 10):
-        result_data[index + 1] = decile_returns_list[:, index]
-    df_result = pd.DataFrame(data=result_data)
 
     df_predictions.to_csv(
         'prediction/{case_number}-{file_name}.csv'.format(case_number=case_number, file_name=file_name), index=False)
-    df_result.to_csv('result/{case_number}-{file_name}.csv'.format(case_number=case_number, file_name=file_name),
-                     index=False)

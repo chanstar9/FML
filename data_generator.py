@@ -56,17 +56,13 @@ if __name__ == '__main__':
 
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
-                       SHORT_SALE_VOLUME_RATIO]
+                       # SHORT_SALE_VOLUME_RATIO
+                       ]
 
     columns.extend(rolling_columns)
 
-    all_portfolio = Portfolio()
+    all_portfolio = Portfolio(start_date='2004-05-31')
+    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    kospi_portfolio = all_portfolio.loc[all_portfolio[EXCHANGE] == '유가증권시장', :]
-    kosdaq_portfolio = all_portfolio.loc[all_portfolio[EXCHANGE] == '코스닥', :]
     all_set = get_data_set(all_portfolio, rolling_columns)
-    kospi_set = get_data_set(kospi_portfolio, rolling_columns)
-    kosdaq_set = get_data_set(kosdaq_portfolio, rolling_columns)
     all_set.to_csv('data/all.csv', index=False)
-    kospi_set.to_csv('data/kospi.csv', index=False)
-    kosdaq_set.to_csv('data/kosdaq.csv', index=False)

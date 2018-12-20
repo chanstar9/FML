@@ -16,7 +16,7 @@ def cumulate(ret):
     return ret
 
 
-pf = Portfolio(start_date='2012-05-31')
+pf = Portfolio(start_date='2007-04-30')
 pf.set_benchmark(KOSPI)
 kospi = pf.get_benchmark().loc[:, [DATE, BENCHMARK_RET_1]]
 kospi = kospi.set_index([DATE]).dropna()
@@ -26,14 +26,14 @@ kosdaq = pf.get_benchmark().loc[:, [DATE, BENCHMARK_RET_1]]
 kosdaq = kosdaq.set_index([DATE]).dropna()
 kosdaq = cumulate(kosdaq)
 
-model_num = 50
+model_num = 10
 QUANTILE = 'quantile'
 predicted_ret_1 = 'predict_return_1'
-chunk_num = 2
+chunk_num = 10
 labels = range(1, chunk_num + 1)
 
 file_names = ['{}-NN3_3-all-all-linear-he_uniform-glorot_uniform-none.csv'.format(x)
-              for x in range(100, 100 + model_num)]
+              for x in range(200, 200 + model_num)]
 
 predictions = [pd.read_csv('prediction/{}'.format(file_name)) for file_name in file_names]
 selected_predictions = []
