@@ -11,10 +11,9 @@ pf = Portfolio()
 
 total_periodic_integrity = pd.DataFrame()
 for factor in COMPANY_FACTORS:
-    integrative_factors = pf.loc[~pd.isna(pf[factor]), [DATE, factor]]
-    all_factors = pf.loc[:, [DATE, factor]]
-    integrative_counts = integrative_factors.groupby(DATE).count()
-    all_counts = all_factors.groupby(DATE).count()
+    integrative_counts = pf.loc[:, [DATE, factor]].groupby(DATE).count()
+    all_counts = pf.loc[:, [DATE, CODE]].groupby(DATE).count()
+    all_counts.rename(columns={CODE: factor}, inplace=True)
     factor_periodic_integrity = integrative_counts / all_counts
     factor_periodic_integrity.fillna(0, inplace=True)
     total_periodic_integrity = pd.concat([total_periodic_integrity, factor_periodic_integrity], axis=1, sort=True)
