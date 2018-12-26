@@ -34,7 +34,7 @@ if __name__ == '__main__':
     # print('Param: {}'.format(params[case_number]))
     # simulate(param=params[case_number], case_number=case_number)
     simulate(param={
-        TRAINING_SET: ALL,
+        TRAINING_SET: ALL,   # KOspi kosdaQ
         TEST_SET: ALL,
         BATCH_SIZE: 300,
         EPOCHS: 100,
@@ -46,3 +46,7 @@ if __name__ == '__main__':
         DROPOUT: False,
         DROPOUT_RATE: 0.5
     }, case_number=0)
+
+ # case number 보기 편하라고
+
+ # keras dropout 문제 있음
