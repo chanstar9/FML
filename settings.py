@@ -19,6 +19,7 @@ BIAS_REGULARIZER = 'bias_regularizer'
 HIDDEN_LAYER = 'hidden_layer'
 DROPOUT = 'dropout'
 DROPOUT_RATE = 'dropout_rate'
+dummy = 'sector'
 
 # DATA_SET
 ALL = 'all'
@@ -44,7 +45,6 @@ NONE = 'none'
 L1 = 'l1'
 L2 = 'l2'
 L1_L2 = 'l1_l2'
-L1+L2 =
 
 # HIDDEN_LAYER_NAME
 NN3_1 = 'NN3_1'
