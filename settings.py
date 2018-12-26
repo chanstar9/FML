@@ -19,12 +19,12 @@ BIAS_REGULARIZER = 'bias_regularizer'
 HIDDEN_LAYER = 'hidden_layer'
 DROPOUT = 'dropout'
 DROPOUT_RATE = 'dropout_rate'
-dummy = 'sector'
 
 # DATA_SET
 ALL = 'all'
 KOSPI = 'kospi'
 KOSDAQ = 'kosdaq'
+dummy = 'sector'
 
 # ACTIVATION
 LINEAR = 'linear'
