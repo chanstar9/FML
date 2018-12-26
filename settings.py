@@ -44,6 +44,7 @@ NONE = 'none'
 L1 = 'l1'
 L2 = 'l2'
 L1_L2 = 'l1_l2'
+L1+L2 =
 
 # HIDDEN_LAYER_NAME
 NN3_1 = 'NN3_1'
