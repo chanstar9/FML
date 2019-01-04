@@ -21,7 +21,7 @@ USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month da
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
 TRAIN_START_DATE = (
-        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
+        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=USED_PAST_MONTHS + TRAINING_MONTHS + 1)
 ).strftime('%Y-%m-%d')
 
 pf = Portfolio()
