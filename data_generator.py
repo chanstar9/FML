@@ -53,16 +53,11 @@ def get_data_set(portfolio, rolling_columns):
     return data_set
 
 
-if __name__ == '__main__':
+def save_all():
     columns = [DATE, CODE, RET_1]
-
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
-                       # SHORT_SALE_VOLUME_RATIO
-                       ]
-
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
-
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
@@ -70,3 +65,7 @@ if __name__ == '__main__':
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/all.csv', index=False)
+
+
+if __name__ == '__main__':
+    save_all()
