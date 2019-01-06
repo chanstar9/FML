@@ -5,6 +5,7 @@
 """
 import pandas as pd
 from ksif.core.columns import *
+from ksif import Portfolio
 import matplotlib.pyplot as plt
 
 QUANTILE = 'quantile'
@@ -23,7 +24,8 @@ def plot_intersection_ensemble(model_name, start_number, end_number, step=1, qua
     labels = range(1, quantile + 1)
     file_names = ['{}-{}.csv'.format(x, model_name)
                   for x in range(start_number, end_number + 1)]
-    predictions = [pd.read_csv('prediction/{}/{}'.format(model_name, file_name), parse_dates=[DATE]) for file_name in file_names]
+    predictions = [pd.read_csv('prediction/{}/{}'.format(model_name, file_name), parse_dates=[DATE]) for file_name in
+                   file_names]
     selected_predictions = []
     for prediction in predictions:
         prediction[QUANTILE] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
@@ -70,13 +72,31 @@ def plot_intersection_ensemble(model_name, start_number, end_number, step=1, qua
     axes[1].legend(loc='upper left')
     fig.show()
 
+    # Summary
+    for ensemble_prediction in ensemble_predictions:
+        ensemble_prediction[DATE] = ensemble_prediction[DATE].astype(str)
+    ensemble_portfolios = [Portfolio(ensemble_prediction) for ensemble_prediction in ensemble_predictions]
+    ensemble_outcomes = [ensemble_portfolio.outcome() for ensemble_portfolio in ensemble_portfolios]
+    total_returns = [ensemble_outcome['total_return'] for ensemble_outcome in ensemble_outcomes]
+    active_returns = [ensemble_outcome['active_return'] for ensemble_outcome in ensemble_outcomes]
+    active_risks = [ensemble_outcome['active_risk'] for ensemble_outcome in ensemble_outcomes]
+    information_ratios = [ensemble_outcome['information_ratio'] for ensemble_outcome in ensemble_outcomes]
+    ensemble_summary = pd.DataFrame({
+        'total_return': total_returns,
+        'active_return': active_returns,
+        'active_risk': active_risks,
+        'information_ratio': information_ratios
+    }, index=ensemble_numbers.columns)
+    ensemble_summary.to_csv('summary/intersection_ensemble/{}.csv'.format(model_name))
+
 
 if __name__ == '__main__':
     start_number = 0
     end_number = 9
 
-    model_name = 'NN3_3-all-all-linear-he_uniform-glorot_uniform-none'
-    plot_intersection_ensemble(model_name, start_number, end_number, step=1)
+    model_name = 'NN3_3-all-linear-he_uniform-glorot_uniform-none'
+    plot_intersection_ensemble(model_name, start_number, end_number, step=1, quantile=40)
 
-    model_name = 'DNN8_4-all-all-relu-he_uniform-glorot_uniform-none'
-    plot_intersection_ensemble(model_name, start_number, end_number, step=1)
+    model_name = 'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5'
+    plot_intersection_ensemble(model_name, start_number, end_number, step=1, quantile=40)
+
