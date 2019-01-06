@@ -117,8 +117,8 @@ def get_predictions(model, X, actual_y):
          pd.DataFrame(prediction, columns=[predict_ret_1])],
         axis=1)
     df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
-    df_prediction[actual_rank] = df_prediction[RET_1].rank()
-    df_prediction[predict_rank] = df_prediction[predict_ret_1].rank()
+    df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
+    df_prediction[predict_rank] = df_prediction[predict_ret_1].rank(ascending=False)
 
     return df_prediction
 
