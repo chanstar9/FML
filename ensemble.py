@@ -16,7 +16,7 @@ QUANTILE = 'quantile'
 PREDICTED_RET_1 = 'predict_return_1'
 
 
-def get_intersection_ensemble_predictions(model_name: str, start_number: int = 1, end_number: int = 9,
+def get_intersection_ensemble_predictions(model_name: str, start_number: int = 0, end_number: int = 9,
                                           quantile: int = 40):
     """
     :return ensemble_predictions:
@@ -41,7 +41,7 @@ def get_intersection_ensemble_predictions(model_name: str, start_number: int = 1
     return ensemble_predictions
 
 
-def get_geometric_ensemble_predictions(model_name: str, start_number: int = 1, end_number: int = 9,
+def get_geometric_ensemble_predictions(model_name: str, start_number: int = 0, end_number: int = 9,
                                        quantile: int = 40):
     """
     :return ensemble_predictions:
@@ -115,13 +115,15 @@ def _cumulate(ret):
     return ret
 
 
-def plot_intersection_ensemble(method: str, model_name: str, start_number: int = 1, end_number: int = 9, step: int = 1,
+def plot_intersection_ensemble(method: str, model_name: str, start_number: int = 0, end_number: int = 9, step: int = 1,
                                quantile: int = 40) -> None:
     # Check parameters
     assert method in METHODS, "method does not exist."
     assert end_number > start_number + 1, "end_number should be bigger than (start_number + 1)."
     assert step >= 1, "step should be a positive integer."
     assert quantile > 1, "quantile should be an integer bigger than 1."
+
+    result_file_name = 'summary/{}_ensemble/{}-{}'.format(method.lower(), quantile, model_name)
 
     get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
 
@@ -144,45 +146,67 @@ def plot_intersection_ensemble(method: str, model_name: str, start_number: int =
     ensemble_cumulative_returns.fillna(method='ffill', inplace=True)
     ensemble_cumulative_returns.fillna(0, inplace=True)
 
-    # Plot
-    fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(10, 12))
-    ensemble_numbers.plot(ax=axes[0], colormap='Blues')
-    axes[0].set_title('{}:{}, Top {}-quantile'.format(method, model_name, quantile), fontdict={'fontsize': 16})
-    axes[0].set_ylabel('# of companies')
-    axes[0].legend(loc='upper left')
-    ensemble_cumulative_returns.plot(ax=axes[1], colormap='Blues')
-    axes[1].set_xlabel('Date')
-    axes[1].set_ylabel('Return')
-    axes[1].legend(loc='upper left')
-    fig.show()
-
     # Summary
     for ensemble_prediction in ensemble_predictions:
         ensemble_prediction[DATE] = ensemble_prediction[DATE].astype(str)
-    ensemble_portfolios = [Portfolio(ensemble_prediction) for ensemble_prediction in ensemble_predictions]
-    ensemble_outcomes = [ensemble_portfolio.outcome() for ensemble_portfolio in ensemble_portfolios]
-    total_returns = [ensemble_outcome['total_return'] for ensemble_outcome in ensemble_outcomes]
-    active_returns = [ensemble_outcome['active_return'] for ensemble_outcome in ensemble_outcomes]
-    active_risks = [ensemble_outcome['active_risk'] for ensemble_outcome in ensemble_outcomes]
-    information_ratios = [ensemble_outcome['information_ratio'] for ensemble_outcome in ensemble_outcomes]
+    ensemble_portfolios = [Portfolio(ensemble_prediction) for ensemble_prediction in
+                           ensemble_predictions[(step - 1)::step]]
+    ensemble_outcomes = [ensemble_portfolio.outcome() for ensemble_portfolio in
+                         ensemble_portfolios[(step - 1)::step]]
+    total_returns = [ensemble_outcome['total_return'] for ensemble_outcome in
+                     ensemble_outcomes[(step - 1)::step]]
+    active_returns = [ensemble_outcome['active_return'] for ensemble_outcome in
+                      ensemble_outcomes[(step - 1)::step]]
+    active_risks = [ensemble_outcome['active_risk'] for ensemble_outcome in
+                    ensemble_outcomes[(step - 1)::step]]
+    information_ratios = [ensemble_outcome['information_ratio'] for ensemble_outcome in
+                          ensemble_outcomes[(step - 1)::step]]
     ensemble_summary = pd.DataFrame({
         'total_return': total_returns,
         'active_return': active_returns,
         'active_risk': active_risks,
         'information_ratio': information_ratios
     }, index=ensemble_numbers.columns)
-    ensemble_summary.to_csv('summary/intersection_ensemble/{}.csv'.format(model_name))
+    ensemble_summary.to_csv(result_file_name + '.csv')
+    for ensemble_prediction in ensemble_predictions:
+        ensemble_prediction[DATE] = pd.to_datetime(ensemble_prediction[DATE], format='%Y-%m-%d')
+
+    # Plot
+    fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 12))
+
+    ensemble_numbers.plot(ax=axes[0], colormap='Blues')
+    axes[0].set_ylim(0, 50)
+    axes[0].set_title('{}:{}, Top {}-quantile'.format(method, model_name, quantile), fontdict={'fontsize': 14})
+    axes[0].set_xlabel('Date')
+    axes[0].set_ylabel('# of companies')
+    axes[0].legend(loc='upper left')
+
+    ensemble_cumulative_returns.plot(ax=axes[1], colormap='Blues')
+    axes[1].set_ylim(-1, 16)
+    axes[1].set_xlabel('Date')
+    axes[1].set_ylabel('Return')
+    axes[1].legend(loc='upper left')
+
+    ensembles = ensemble_cumulative_returns.columns
+    trend_model = np.polyfit(ensembles, information_ratios, 1)
+    get_trend = np.poly1d(trend_model)
+    axes[2].plot(ensembles, information_ratios, 'black', ensembles, get_trend(ensembles), 'r--')
+    axes[2].set_ylim(0.3, 0.5)
+    axes[2].set_xlabel('# of ensembles')
+    axes[2].set_ylabel('Information ratio')
+
+    plt.savefig(result_file_name + '.png')
+    fig.show('summary/{}_ensemble/{}.csv'.format(method.lower(), model_name))
 
 
 if __name__ == '__main__':
-    model_name = 'NN3_3-all-linear-he_uniform-glorot_uniform-none'
-    plot_intersection_ensemble(INTERSECTION, model_name)
+    models = [
+        'NN3_3-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_2-all-linear-he_uniform-glorot_uniform-none'
+    ]
 
-    model_name = 'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5'
-    plot_intersection_ensemble(INTERSECTION, model_name)
-
-    model_name = 'NN3_3-all-linear-he_uniform-glorot_uniform-none'
-    plot_intersection_ensemble(GEOMETRIC, model_name)
-
-    model_name = 'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5'
-    plot_intersection_ensemble(GEOMETRIC, model_name)
+    for method in METHODS:
+        for model in models:
+            plot_intersection_ensemble(method, model)
