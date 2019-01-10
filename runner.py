@@ -37,13 +37,13 @@ if __name__ == '__main__':
 
     simulate(param={
         DATA_SET: ALL,
-        BATCH_SIZE: 300,
+        BATCH_SIZE: 10000,
         EPOCHS: 100,
         ACTIVATION: LINEAR,
         BIAS_INITIALIZER: HE_UNIFORM,
         KERNEL_INITIALIZER: GLOROT_UNIFORM,
         BIAS_REGULARIZER: NONE,
-        HIDDEN_LAYER: NN3_3,
-        DROPOUT: False,
+        HIDDEN_LAYER: DNN8_3,
+        DROPOUT: True,
         DROPOUT_RATE: 0.5
-    }, case_number=0)
+    }, case_number=9)
