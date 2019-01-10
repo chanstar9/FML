@@ -6,6 +6,7 @@
 import os
 from pathlib import Path
 import keras
+from keras import backend as k
 import tensorflow as tf
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
@@ -17,7 +18,6 @@ from dateutil.relativedelta import relativedelta
 
 from settings import *
 from data_generator import START_DATE, USED_PAST_MONTHS
-
 
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
@@ -47,7 +47,6 @@ def get_train_test_set(data_set_key, test_month):
 
 
 def train_model(month, param):
-    tf.reset_default_graph()
     data_train, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
 
     # Make data a numpy array
@@ -139,7 +138,17 @@ def get_file_name(param) -> str:
 
 
 def simulate(param, case_number):
+    print("Param: {}".format(param))
     print("Case number: {}".format(case_number))
+
+    tf.logging.set_verbosity(3)
+    # TensorFlow wizardry
+    config = tf.ConfigProto()
+    # Don't pre-allocate memory; allocate as-needed
+    config.gpu_options.allow_growth = True
+    # Create a session with the above options specified.
+    k.set_session(tf.Session(config=config))
+
     file_name = get_file_name(param)
 
     test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
