@@ -9,6 +9,9 @@
 # Result file
 *.png
 
+# Virtual environment
+venv
+
 .DS_Store
 __pycache__/
 data/.DS_Store
