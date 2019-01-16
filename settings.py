@@ -23,6 +23,7 @@ DROPOUT_RATE = 'dropout_rate'
 ALL = 'all'
 KOSPI = 'kospi'
 KOSDAQ = 'kosdaq'
+dummy = 'sector'
 
 # ACTIVATION
 LINEAR = 'linear'
