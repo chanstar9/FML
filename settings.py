@@ -25,6 +25,7 @@ ALL = 'all'
 KOSPI = 'kospi'
 KOSDAQ = 'kosdaq'
 FILTER = 'filter'
+BOLLINGER = 'bollinger'
 
 # ACTIVATION
 LINEAR = 'linear'
