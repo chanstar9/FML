@@ -8,8 +8,7 @@ from keras.activations import linear, tanh, relu
 from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
 from keras.regularizers import l1, l2, l1_l2
 
-TRAINING_SET = 'training_set'
-TEST_SET = 'test_set'
+DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
 EPOCHS = 'epochs'
 ACTIVATION = 'activation'

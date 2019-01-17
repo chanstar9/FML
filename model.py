@@ -3,7 +3,10 @@
 :Author: Jaekyoung Kim
 :Date: 2018-09-23
 """
+import os
+from pathlib import Path
 import keras
+from keras import backend as k
 import tensorflow as tf
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
@@ -14,14 +17,12 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from settings import *
-from data_generator import START_DATE
+from data_generator import START_DATE, USED_PAST_MONTHS
 
-
-USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
 TRAIN_START_DATE = (
-        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
+        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=USED_PAST_MONTHS + TRAINING_MONTHS + 1)
 ).strftime('%Y-%m-%d')
 
 pf = Portfolio()
@@ -30,9 +31,9 @@ months = sorted(pf[DATE].unique())[:-1]
 result_columns = [RET_1]
 
 
-def get_train_test_set(training_set_key, test_set_key, test_month):
-    training_set = get_data_set(training_set_key)
-    test_set = get_data_set(test_set_key)
+def get_train_test_set(data_set_key, test_month):
+    training_set = get_data_set(data_set_key)
+    test_set = get_data_set(data_set_key)
 
     test_index = months.index(test_month)
     assert test_index - USED_PAST_MONTHS - TRAINING_MONTHS >= 0, "test_month is too early"
@@ -46,9 +47,7 @@ def get_train_test_set(training_set_key, test_set_key, test_month):
 
 
 def train_model(month, param):
-    tf.reset_default_graph()
-    data_train, data_test = get_train_test_set(training_set_key=param[TRAINING_SET],
-                                               test_set_key=param[TEST_SET], test_month=month)
+    data_train, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
 
     # Make data a numpy array
     data_train_array = data_train.values
@@ -117,28 +116,39 @@ def get_predictions(model, X, actual_y):
          pd.DataFrame(prediction, columns=[predict_ret_1])],
         axis=1)
     df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
-    df_prediction[actual_rank] = df_prediction[RET_1].rank()
-    df_prediction[predict_rank] = df_prediction[predict_ret_1].rank()
+    df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
+    df_prediction[predict_rank] = df_prediction[predict_ret_1].rank(ascending=False)
 
     return df_prediction
 
 
 def get_file_name(param) -> str:
-    file_name = '{hidden_layer}-{training_set}-{test_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
+    file_name = '{hidden_layer}-{data_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
         hidden_layer=param[HIDDEN_LAYER],
-        training_set=param[TRAINING_SET],
-        test_set=param[TEST_SET],
+        data_set=param[DATA_SET],
         activation=param[ACTIVATION],
         bias_initializer=param[BIAS_INITIALIZER],
         kernel_initializer=param[KERNEL_INITIALIZER],
         bias_regularizer=param[BIAS_REGULARIZER],
     )
+    if param[DROPOUT]:
+        file_name = file_name + '-{}'.format(param[DROPOUT_RATE])
 
     return file_name
 
 
 def simulate(param, case_number):
+    print("Param: {}".format(param))
     print("Case number: {}".format(case_number))
+
+    tf.logging.set_verbosity(3)
+    # TensorFlow wizardry
+    config = tf.ConfigProto()
+    # Don't pre-allocate memory; allocate as-needed
+    config.gpu_options.allow_growth = True
+    # Create a session with the above options specified.
+    k.set_session(tf.Session(config=config))
+
     file_name = get_file_name(param)
 
     test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
@@ -152,5 +162,17 @@ def simulate(param, case_number):
 
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
 
+    # If a directory for this model does not exist, make it.
+    data_dir = 'prediction/{}'.format(file_name)
+    if not Path(data_dir).exists():
+        os.makedirs(data_dir)
+
+    # Save the result of the model with a case number.
     df_predictions.to_csv(
-        'prediction/{case_number}-{file_name}.csv'.format(case_number=case_number, file_name=file_name), index=False)
+        '{data_dir}/{case_number}-{file_name}.csv'.format(
+            data_dir=data_dir,
+            case_number=case_number,
+            file_name=file_name
+        ),
+        index=False
+    )
