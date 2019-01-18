@@ -176,3 +176,7 @@ def simulate(param, case_number):
         ),
         index=False
     )
+
+    # Clean up the memory
+    k.get_session().close()
+    tf.reset_default_graph()
