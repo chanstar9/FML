@@ -108,7 +108,7 @@ def train_model(month, param):
 def get_predictions(model, X, actual_y):
     predict_ret_1 = 'predict_' + RET_1
     actual_rank = 'actual_rank'
-    predict_rank = 'predict_rank'
+    predicted_rank = 'predicted_rank'
 
     prediction = model.predict(X, verbose=0)
     df_prediction = pd.concat(
@@ -117,7 +117,7 @@ def get_predictions(model, X, actual_y):
         axis=1)
     df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
     df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
-    df_prediction[predict_rank] = df_prediction[predict_ret_1].rank(ascending=False)
+    df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
 
     return df_prediction
 
