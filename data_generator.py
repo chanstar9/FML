@@ -7,6 +7,7 @@ import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 START_DATE = '2007-04-30'
 
@@ -56,7 +57,7 @@ def get_data_set(portfolio, rolling_columns):
 def save_all():
     columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO, KRX_SECTOR]
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
@@ -70,7 +71,7 @@ def save_all():
 def save_filter():
     columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO, KRX_SECTOR]
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
@@ -86,7 +87,30 @@ def save_filter():
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/filter.csv', index=False)
 
-#%%
+
+def save_sector():
+    columns = [DATE, CODE, RET_1]
+    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
+    columns.extend(rolling_columns)
+    all_portfolio = Portfolio(start_date=START_DATE)
+    # sector를 one_hot_encoding
+    all_portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
+    krx_sector = all_portfolio[KRX_SECTOR].unique()
+    rolling_columns.append(krx_sector)
+    # sector를 숫자로 나타냄
+    labeled_sector = LabelEncoder().fit_transform(all_portfolio[KRX_SECTOR])
+    # 숫자로 나타낸 것을 모스부호로 표현
+    one_hot_encoded_sector = OneHotEncoder(sparse=False, categories='auto').fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
+    # 기존 데이터에 붙히기
+    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sector)
+    all_portfolio[df_one_hot_encoded_sector.columns] = df_one_hot_encoded_sector
+    # 데이터 생성하기
+    all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set.to_csv('data/sector.csv', index=False)
+
+
 if __name__ == '__main__':
     save_all()
     save_filter()
+    save_sector()
