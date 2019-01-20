@@ -20,6 +20,7 @@ ACTUAL_RANK = 'actual_rank'
 PREDICTED_RANK = 'predicted_rank'
 COUNT = 'count'
 
+RANK = 'rank'
 CORRECT = 'correct'
 ACCURACY = 'accuracy'
 
@@ -148,8 +149,30 @@ def _calculate_accuracy(ensemble_portfolio, predictions, quantile):
     return accuracy
 
 
-def plot_ensemble(method: str, model_name: str, start_number: int = 0, end_number: int = 9, step: int = 1,
-                  quantile: int = 40, show_plot=True) -> pd.DataFrame:
+def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number: int = 9, step: int = 1,
+                 quantile: int = 40, show_plot=True):
+    """
+
+    :param method: (str)
+    :param model_name: (str)
+    :param start_number: (int)
+    :param end_number: (int)
+    :param step: (int)
+    :param quantile: (int)
+    :param show_plot: (bool)
+
+    :return ensemble_summary: (DataFrame)
+        PORTFOLIO_RETURN    | (float)
+        ACTIVE_RETURN       | (float)
+        ACTIVE_RISK         | (float)
+        IR                  | (float)
+        CAGR                | (float)
+        ACCURACY            | (float)
+    :return ensemble_portfolios: ([Portfolio])
+        DATE                | (datetime)
+        CODE                | (str)
+        RET_1               | (float)
+    """
     # Check parameters
     assert method in METHODS, "method does not exist."
     assert end_number > start_number + 1, "end_number should be bigger than (start_number + 1)."
@@ -236,7 +259,7 @@ def plot_ensemble(method: str, model_name: str, start_number: int = 0, end_numbe
         plt.savefig('summary/' + result_file_name + '.png')
         fig.show()
 
-    return ensemble_summary
+    return ensemble_summary, ensemble_portfolios
 
 
 def compare_ensemble(methods, models, to_csv=True, show_plot=False):
@@ -246,10 +269,58 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
     rank_p_values = []
     IRs = []
     accuracies = []
+    kospi_larges = []
+    kospi_middles = []
+    kospi_smalls = []
+    kosdaq_larges = []
+    kosdaq_middles = []
+    kosdaq_smalls = []
+
+    firms = Portfolio(include_holding=True, include_finance=True, include_managed=True, include_suspended=True).loc[:,
+            [DATE, CODE, MKTCAP, EXCHANGE]]
+    firms[DATE] = pd.to_datetime(firms[DATE])
+
+    firms[RANK] = firms[[DATE, MKTCAP]].groupby(DATE).rank(ascending=False)
+    firms[KOSPI_LARGE] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '유가증권시장') and (row[RANK] <= 100) else 0, axis=1)
+    firms[KOSPI_MIDDLE] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '유가증권시장') and (100 < row[RANK] <= 300) else 0, axis=1)
+    firms[KOSPI_SMALL] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '유가증권시장') and (300 < row[RANK]) else 0, axis=1)
+    firms[KOSDAQ_LARGE] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '코스닥') and (row[RANK] <= 100) else 0, axis=1)
+    firms[KOSDAQ_MIDDLE] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '코스닥') and (100 < row[RANK] <= 300) else 0, axis=1)
+    firms[KOSDAQ_SMALL] = firms.apply(
+        lambda row: 1 if (row[EXCHANGE] == '코스닥') and (300 < row[RANK]) else 0, axis=1)
+
+    firms = firms.loc[
+            :, [DATE, CODE, KOSPI_LARGE, KOSPI_MIDDLE, KOSPI_SMALL, KOSDAQ_LARGE, KOSDAQ_MIDDLE, KOSDAQ_SMALL]
+            ]
 
     for method in methods:
         for model in models:
-            ensemble_summary = plot_ensemble(method, model, show_plot=show_plot)
+            ensemble_summary, ensemble_portfolios = get_ensemble(method, model, show_plot=show_plot)
+            ensemble_portfolio = pd.merge(ensemble_portfolios[-1], firms, on=[DATE, CODE])
+            ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(DATE).count()
+            ensemble_portfolio_count.rename(columns={CODE: COUNT}, inplace=True)
+            ensemble_portfolio_sum = ensemble_portfolio[[
+                DATE, KOSPI_LARGE, KOSPI_MIDDLE, KOSPI_SMALL, KOSDAQ_LARGE, KOSDAQ_MIDDLE, KOSDAQ_SMALL
+            ]].groupby(DATE).sum()
+            ensemble_portfolio_ratio = pd.merge(ensemble_portfolio_sum, ensemble_portfolio_count, on=DATE)
+            ensemble_portfolio_ratio[KOSPI_LARGE] \
+                = ensemble_portfolio_ratio[KOSPI_LARGE] / ensemble_portfolio_ratio[COUNT]
+            ensemble_portfolio_ratio[KOSPI_MIDDLE] \
+                = ensemble_portfolio_ratio[KOSPI_MIDDLE] / ensemble_portfolio_ratio[COUNT]
+            ensemble_portfolio_ratio[KOSPI_SMALL] \
+                = ensemble_portfolio_ratio[KOSPI_SMALL] / ensemble_portfolio_ratio[COUNT]
+            ensemble_portfolio_ratio[KOSDAQ_LARGE] \
+                = ensemble_portfolio_ratio[KOSDAQ_LARGE] / ensemble_portfolio_ratio[COUNT]
+            ensemble_portfolio_ratio[KOSDAQ_MIDDLE] \
+                = ensemble_portfolio_ratio[KOSDAQ_MIDDLE] / ensemble_portfolio_ratio[COUNT]
+            ensemble_portfolio_ratio[KOSDAQ_SMALL] \
+                = ensemble_portfolio_ratio[KOSDAQ_SMALL] / ensemble_portfolio_ratio[COUNT]
+
             file_names.append(_get_file_name(method, model))
             CAGRs.append(ensemble_summary[CAGR].values[-1])
             rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
@@ -257,6 +328,12 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
             rank_p_values.append(rankIC[1])
             IRs.append(ensemble_summary[IR].values[-1])
             accuracies.append(ensemble_summary[ACCURACY].values[-1])
+            kospi_larges.append(ensemble_portfolio_ratio[KOSPI_LARGE].mean())
+            kospi_middles.append(ensemble_portfolio_ratio[KOSPI_MIDDLE].mean())
+            kospi_smalls.append(ensemble_portfolio_ratio[KOSPI_SMALL].mean())
+            kosdaq_larges.append(ensemble_portfolio_ratio[KOSDAQ_LARGE].mean())
+            kosdaq_middles.append(ensemble_portfolio_ratio[KOSDAQ_MIDDLE].mean())
+            kosdaq_smalls.append(ensemble_portfolio_ratio[KOSDAQ_SMALL].mean())
 
     comparison_result = pd.DataFrame(data={
         'Model': file_names,
@@ -265,6 +342,12 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
         'Rank p-value': rank_p_values,
         'IR': IRs,
         'Accuracy': accuracies,
+        'KOSPI Large': kospi_larges,
+        'KOSPI Middle': kospi_middles,
+        'KOSPI Small': kospi_smalls,
+        'KOSDAQ Large': kosdaq_larges,
+        'KOSDAQ Middle': kosdaq_middles,
+        'KOSDAQ Small': kosdaq_smalls,
     })
 
     if to_csv:
