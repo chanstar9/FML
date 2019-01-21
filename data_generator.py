@@ -33,8 +33,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None):
             data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
 
     if dummy_columns:
-        for column in dummy_columns:
-            result_columns.append(column)
+        result_columns.extend(dummy_columns)
 
     data_set = data_set[result_columns]
     data_set = data_set.dropna().reset_index(drop=True)
