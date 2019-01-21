@@ -3,10 +3,11 @@
 :Author: Jaekyoung Kim
 :Date: 2018. 9. 28.
 """
-import pandas as pd
 from keras.activations import linear, tanh, relu
 from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
 from keras.regularizers import l1, l2, l1_l2
+
+from data_generator import *
 
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
@@ -18,14 +19,6 @@ BIAS_REGULARIZER = 'bias_regularizer'
 HIDDEN_LAYER = 'hidden_layer'
 DROPOUT = 'dropout'
 DROPOUT_RATE = 'dropout_rate'
-
-# DATA_SET
-ALL = 'all'
-KOSPI = 'kospi'
-KOSDAQ = 'kosdaq'
-FILTER = 'filter'
-BOLLINGER = 'bollinger'
-SECTOR = 'sector'
 
 # ACTIVATION
 LINEAR = 'linear'
