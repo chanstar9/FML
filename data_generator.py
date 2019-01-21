@@ -3,10 +3,10 @@
 :Author: Jaekyoung Kim
 :Date: 2018-09-21
 """
-import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
+
 from settings import *
 
 START_DATE = '2007-04-30'
@@ -80,13 +80,13 @@ def save_bollinger():
     rolling_std = all_portfolio.groupby(NAME).endp.rolling(20).std()
     bollinger = rolling_mean - 2 * rolling_std
     all_portfolio[BOLLINGER] = bollinger.values
-    all_portfolio.loc[all_portfolio.endp < all_portfolio.bollinger, :]
+    all_portfolio = all_portfolio.loc[all_portfolio.endp < all_portfolio.bollinger, :]
 
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/bollinger.csv', index=False)
 
 
 if __name__ == '__main__':
-    # save_all()
+    save_all()
     save_filter()
-    # save_bollinger()
+    save_bollinger()
