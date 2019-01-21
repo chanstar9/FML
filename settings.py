@@ -69,6 +69,7 @@ def get_data(data_name):
 data_sets = {
     ALL: get_data(ALL),
     FILTER: get_data(FILTER),
+    BOLLINGER: get_data(BOLLINGER)
 }
 
 activations = {
