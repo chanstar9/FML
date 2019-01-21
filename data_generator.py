@@ -32,7 +32,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None):
             scaled_columns.append(column_i)
             data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
 
-    if dummy_columns:
+    if dummy_columns is not None:
         result_columns.extend(dummy_columns)
 
     data_set = data_set[result_columns]
@@ -120,7 +120,7 @@ def save_sector():
 
 
 if __name__ == '__main__':
-    # save_all()
-    # save_filter()
-    # save_bollinger()
+    save_all()
+    save_filter()
+    save_bollinger()
     save_sector()
