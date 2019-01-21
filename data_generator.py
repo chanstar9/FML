@@ -8,45 +8,24 @@ from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from settings import *
 
 START_DATE = '2007-04-30'
+USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 scaler = MinMaxScaler()
 
-#%%
+
 def get_data_set(portfolio, rolling_columns):
     result_columns = [DATE, CODE, RET_1]
     rolled_columns = []
     data_set = portfolio.reset_index(drop=True)
     for column in rolling_columns:
-        t_0 = column + '_t'
-        t_1 = column + '_t-1'
-        t_2 = column + '_t-2'
-        t_3 = column + '_t-3'
-        t_4 = column + '_t-4'
-        t_5 = column + '_t-5'
-        t_6 = column + '_t-6'
-        t_7 = column + '_t-7'
-        t_8 = column + '_t-8'
-        t_9 = column + '_t-9'
-        t_10 = column + '_t-10'
-        t_11 = column + '_t-11'
-        t_12 = column + '_t-12'
-        result_columns.extend([t_0, t_1, t_2, t_3, t_4, t_5, t_6, t_7, t_8, t_9, t_10, t_11, t_12])
-        rolled_columns.extend([t_0, t_1, t_2, t_3, t_4, t_5, t_6, t_7, t_8, t_9, t_10, t_11, t_12])
-        data_set[t_0] = data_set[column]
-        data_set[t_1] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(1)).reset_index(drop=True)
-        data_set[t_2] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(2)).reset_index(drop=True)
-        data_set[t_3] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(3)).reset_index(drop=True)
-        data_set[t_4] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(4)).reset_index(drop=True)
-        data_set[t_5] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(5)).reset_index(drop=True)
-        data_set[t_6] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(6)).reset_index(drop=True)
-        data_set[t_7] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(7)).reset_index(drop=True)
-        data_set[t_8] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(8)).reset_index(drop=True)
-        data_set[t_9] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(9)).reset_index(drop=True)
-        data_set[t_10] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(10)).reset_index(drop=True)
-        data_set[t_11] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(11)).reset_index(drop=True)
-        data_set[t_12] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(12)).reset_index(drop=True)
+        for i in range(0, USED_PAST_MONTHS + 1):
+            column_i = column + '_t-{}'.format(i)
+            result_columns.append(column_i)
+            rolled_columns.append(column_i)
+            data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
     data_set = data_set[result_columns]
     data_set = data_set.dropna().reset_index(drop=True)
     data_set[rolled_columns] = scaler.fit_transform(data_set[rolled_columns])
@@ -55,10 +34,8 @@ def get_data_set(portfolio, rolling_columns):
 
 
 def save_all():
-    columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    columns.extend(rolling_columns)
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
@@ -69,24 +46,45 @@ def save_all():
 
 
 def save_filter():
-    columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    columns.extend(rolling_columns)
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    # PER < 7.0
-    all_portfolio = all_portfolio.loc[all_portfolio['per'] < 7]
-    # PBR < 1.0
-    all_portfolio = all_portfolio.loc[all_portfolio['pbr'] < 1]
-    # PCR < 4.5
-    all_portfolio = all_portfolio.loc[all_portfolio['pcr'] < 4.5]
+    # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
+    all_portfolio = all_portfolio.loc[(all_portfolio[PER] < 10) & (all_portfolio[PER] > 2)]
+    # 0.2 < PBR < 1.0
+    all_portfolio = all_portfolio.loc[(all_portfolio[PBR] < 1) & (all_portfolio[PBR] > 0.2)]
+    # 2 < PCR < 8
+    all_portfolio = all_portfolio.loc[(all_portfolio[PCR] < 8) & (all_portfolio[PCR] > 2)]
+    # 0 < PSR < 0.8
+    all_portfolio = all_portfolio.loc[all_portfolio[PSR] < 0.8]
+
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/filter.csv', index=False)
 
+
+def save_bollinger():
+    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
+    all_portfolio = Portfolio(start_date=START_DATE)
+    # 최소 시가총액 100억
+    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    # RET_1이 존재하지 않는 마지막 달 제거
+    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+
+    # Bollinger (last 20개월 평균종가보다 낮은 종목)
+    all_portfolio = all_portfolio.sort_values(by=[NAME])
+    rolling_mean = all_portfolio.groupby(NAME).endp.rolling(20).mean()
+    rolling_std = all_portfolio.groupby(NAME).endp.rolling(20).std()
+    bollinger = rolling_mean - 2 * rolling_std
+    all_portfolio[BOLLINGER] = bollinger.values
+    all_portfolio.loc[all_portfolio.endp < all_portfolio.bollinger, :]
+
+    all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set.to_csv('data/bollinger.csv', index=False)
 
 def save_sector():
     columns = [DATE, CODE, RET_1]
@@ -114,3 +112,4 @@ if __name__ == '__main__':
     save_all()
     save_filter()
     save_sector()
+    save_bollinger()
