@@ -9,7 +9,11 @@ from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
-from settings import *
+# DATA_SET
+ALL = 'all'
+FILTER = 'filter'
+BOLLINGER = 'bollinger'
+SECTOR = 'sector'
 
 START_DATE = '2007-04-30'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
@@ -17,19 +21,24 @@ USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month da
 scaler = MinMaxScaler()
 
 
-def get_data_set(portfolio, rolling_columns):
+def get_data_set(portfolio, rolling_columns, dummy_columns=None):
     result_columns = [DATE, CODE, RET_1]
-    rolled_columns = []
+    scaled_columns = []
     data_set = portfolio.reset_index(drop=True)
     for column in rolling_columns:
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
-            rolled_columns.append(column_i)
+            scaled_columns.append(column_i)
             data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
+
+    if dummy_columns:
+        for column in dummy_columns:
+            result_columns.append(column)
+
     data_set = data_set[result_columns]
     data_set = data_set.dropna().reset_index(drop=True)
-    data_set[rolled_columns] = scaler.fit_transform(data_set[rolled_columns])
+    data_set[scaled_columns] = scaler.fit_transform(data_set[scaled_columns])
 
     return data_set
 
@@ -77,14 +86,14 @@ def save_bollinger():
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
 
     # Bollinger (last 20개월 평균종가보다 낮은 종목)
-    all_portfolio = all_portfolio.sort_values(by=[NAME])
-    rolling_mean = all_portfolio.groupby(NAME).endp.rolling(20).mean()
-    rolling_std = all_portfolio.groupby(NAME).endp.rolling(20).std()
-    bollinger = rolling_mean - 2 * rolling_std
-    all_portfolio[BOLLINGER] = bollinger.values
-    all_portfolio = all_portfolio.loc[all_portfolio.endp < all_portfolio.bollinger, :]
+    all_portfolio = all_portfolio.sort_values(by=[NAME]).reset_index(drop=True)
+    all_portfolio['mean'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).mean().reset_index(drop=True)
+    all_portfolio['std'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).std().reset_index(drop=True)
+    all_portfolio[BOLLINGER] = all_portfolio['mean'] - 2 * all_portfolio['std']
+    bollingers = all_portfolio.loc[all_portfolio[ENDP] < all_portfolio[BOLLINGER], [DATE, CODE]]
 
     all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set = pd.merge(all_set, bollingers, on=[DATE, CODE])
     all_set.to_csv('data/bollinger.csv', index=False)
 
 
@@ -96,23 +105,23 @@ def save_sector():
     all_portfolio = Portfolio(start_date=START_DATE)
     # sector를 one_hot_encoding
     all_portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
-    krx_sector = all_portfolio[KRX_SECTOR].unique()
-    rolling_columns.append(krx_sector)
     # sector를 숫자로 나타냄
-    labeled_sector = LabelEncoder().fit_transform(all_portfolio[KRX_SECTOR])
+    label_encoder = LabelEncoder()
+    labeled_sector = label_encoder.fit_transform(all_portfolio[KRX_SECTOR])
+    krx_sectors = label_encoder.classes_
     # 숫자로 나타낸 것을 모스부호로 표현
-    one_hot_encoded_sector = OneHotEncoder(sparse=False, categories='auto').fit_transform(
-        labeled_sector.reshape(len(labeled_sector), 1))
+    one_hot_encoder = OneHotEncoder(sparse=False)
+    one_hot_encoded_sector = one_hot_encoder.fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
     # 기존 데이터에 붙히기
-    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sector)
-    all_portfolio[df_one_hot_encoded_sector.columns] = df_one_hot_encoded_sector
+    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors)
+    all_portfolio[krx_sectors] = df_one_hot_encoded_sector
     # 데이터 생성하기
-    all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set = get_data_set(all_portfolio, rolling_columns, dummy_columns=krx_sectors)
     all_set.to_csv('data/sector.csv', index=False)
 
 
 if __name__ == '__main__':
     # save_all()
     # save_filter()
-    # save_sector()
-    save_bollinger()
+    # save_bollinger()
+    save_sector()
