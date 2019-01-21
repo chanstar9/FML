@@ -55,17 +55,24 @@ DNN8_3 = 'DNN8_3'
 DNN8_4 = 'DNN8_4'
 
 
+class LazyDict(dict):
+
+    def __getitem__(self, item):
+        function, arg = dict.__getitem__(self, item)
+        return function(arg)
+
+
 def get_data(data_name):
     data = pd.read_csv('data/{}.csv'.format(data_name), parse_dates=['date'])
     return data
 
 
-data_sets = {
-    ALL: get_data(ALL),
-    FILTER: get_data(FILTER),
-    BOLLINGER: get_data(BOLLINGER),
-    SECTOR: get_data(SECTOR)
-}
+data_sets = LazyDict({
+    ALL: (get_data, ALL),
+    FILTER: (get_data, FILTER),
+    BOLLINGER: (get_data, BOLLINGER),
+    SECTOR: (get_data, SECTOR),
+})
 
 activations = {
     LINEAR: linear,
