@@ -7,6 +7,7 @@ import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import MinMaxScaler
+from settings import *
 
 START_DATE = '2007-04-30'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
@@ -32,10 +33,8 @@ def get_data_set(portfolio, rolling_columns):
 
 
 def save_all():
-    fixed_columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    fixed_columns.extend(rolling_columns)
     all_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
@@ -45,5 +44,49 @@ def save_all():
     all_set.to_csv('data/all.csv', index=False)
 
 
+def save_filter():
+    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
+    all_portfolio = Portfolio(start_date=START_DATE)
+    # 최소 시가총액 100억
+    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    # RET_1이 존재하지 않는 마지막 달 제거
+    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
+    all_portfolio = all_portfolio.loc[(all_portfolio[PER] < 10) & (all_portfolio[PER] > 2)]
+    # 0.2 < PBR < 1.0
+    all_portfolio = all_portfolio.loc[(all_portfolio[PBR] < 1) & (all_portfolio[PBR] > 0.2)]
+    # 2 < PCR < 8
+    all_portfolio = all_portfolio.loc[(all_portfolio[PCR] < 8) & (all_portfolio[PCR] > 2)]
+    # 0 < PSR < 0.8
+    all_portfolio = all_portfolio.loc[all_portfolio[PSR] < 0.8]
+
+    all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set.to_csv('data/filter.csv', index=False)
+
+
+def save_bollinger():
+    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
+    all_portfolio = Portfolio(start_date=START_DATE)
+    # 최소 시가총액 100억
+    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    # RET_1이 존재하지 않는 마지막 달 제거
+    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+
+    # Bollinger (last 20개월 평균종가보다 낮은 종목)
+    all_portfolio = all_portfolio.sort_values(by=[NAME])
+    rolling_mean = all_portfolio.groupby(NAME).endp.rolling(20).mean()
+    rolling_std = all_portfolio.groupby(NAME).endp.rolling(20).std()
+    bollinger = rolling_mean - 2 * rolling_std
+    all_portfolio[BOLLINGER] = bollinger.values
+    all_portfolio.loc[all_portfolio.endp < all_portfolio.bollinger, :]
+
+    all_set = get_data_set(all_portfolio, rolling_columns)
+    all_set.to_csv('data/bollinger.csv', index=False)
+
+
 if __name__ == '__main__':
-    save_all()
+    # save_all()
+    save_filter()
+    # save_bollinger()

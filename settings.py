@@ -23,6 +23,8 @@ DROPOUT_RATE = 'dropout_rate'
 ALL = 'all'
 KOSPI = 'kospi'
 KOSDAQ = 'kosdaq'
+FILTER = 'filter'
+BOLLINGER = 'bollinger'
 
 # ACTIVATION
 LINEAR = 'linear'
@@ -66,6 +68,8 @@ def get_data(data_name):
 
 data_sets = {
     ALL: get_data(ALL),
+    FILTER: get_data(FILTER),
+    BOLLINGER: get_data(BOLLINGER)
 }
 
 activations = {
