@@ -86,6 +86,7 @@ def save_bollinger():
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/bollinger.csv', index=False)
 
+
 def save_sector():
     columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
@@ -99,7 +100,8 @@ def save_sector():
     # sector를 숫자로 나타냄
     labeled_sector = LabelEncoder().fit_transform(all_portfolio[KRX_SECTOR])
     # 숫자로 나타낸 것을 모스부호로 표현
-    one_hot_encoded_sector = OneHotEncoder(sparse=False, categories='auto').fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
+    one_hot_encoded_sector = OneHotEncoder(sparse=False, categories='auto').fit_transform(
+        labeled_sector.reshape(len(labeled_sector), 1))
     # 기존 데이터에 붙히기
     df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sector)
     all_portfolio[df_one_hot_encoded_sector.columns] = df_one_hot_encoded_sector
@@ -109,7 +111,7 @@ def save_sector():
 
 
 if __name__ == '__main__':
-    save_all()
-    save_filter()
-    save_sector()
+    # save_all()
+    # save_filter()
+    # save_sector()
     save_bollinger()
