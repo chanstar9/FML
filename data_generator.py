@@ -45,7 +45,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None):
 def save_all():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio(start_date=START_DATE)
+    all_portfolio = Portfolio()
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
@@ -57,7 +57,7 @@ def save_all():
 def save_filter():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio(start_date=START_DATE)
+    all_portfolio = Portfolio()
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
@@ -78,7 +78,7 @@ def save_filter():
 def save_bollinger():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio(start_date=START_DATE)
+    all_portfolio = Portfolio()
     # 최소 시가총액 100억
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
@@ -101,7 +101,7 @@ def save_sector():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
-    all_portfolio = Portfolio(start_date=START_DATE)
+    all_portfolio = Portfolio()
     # sector를 one_hot_encoding
     all_portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
     # sector를 숫자로 나타냄

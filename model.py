@@ -4,20 +4,18 @@
 :Date: 2018-09-23
 """
 import os
+from datetime import datetime
 from pathlib import Path
+
 import keras
-from keras import backend as k
 import tensorflow as tf
+from dateutil.relativedelta import relativedelta
+from keras import backend as k
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
-from ksif import Portfolio
-from ksif.core.columns import *
 from tqdm import tqdm
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 
 from settings import *
-from data_generator import START_DATE, USED_PAST_MONTHS
 
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
