@@ -56,8 +56,7 @@ def train_model(month, param):
     X_train = data_train_array[:, 3:]
     y_train = data_train_array[:, 2:3]
     X_test = data_test_array[:, 3:]
-    y_test = data_test_array[:, 2:3]
-    actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+    y_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
     input_dim = X_train.shape[1]
 
@@ -99,25 +98,27 @@ def train_model(month, param):
     model.fit(X_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
-              verbose=0,
-              validation_data=(X_test, y_test))
+              verbose=0)
 
-    return model, X_test, actual_test
+    return model, X_test, y_test
 
 
-def get_predictions(model, X, actual_y):
+def get_predictions(model, X, actual_y=None):
     predict_ret_1 = 'predict_' + RET_1
     actual_rank = 'actual_rank'
     predicted_rank = 'predicted_rank'
 
     prediction = model.predict(X, verbose=0)
-    df_prediction = pd.concat(
-        [actual_y,
-         pd.DataFrame(prediction, columns=[predict_ret_1])],
-        axis=1)
-    df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
-    df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
-    df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
+    if actual_y:
+        df_prediction = pd.concat(
+            [actual_y,
+             pd.DataFrame(prediction, columns=[predict_ret_1])],
+            axis=1)
+        df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
+        df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
+        df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
+    else:
+        pass
 
     return df_prediction
 
@@ -156,9 +157,9 @@ def simulate(param, case_number):
 
     df_predictions = pd.DataFrame()
     for month in tqdm(test_months):
-        model, X_test, actual_test = train_model(month, param)
+        model, X_test, y_test = train_model(month, param)
 
-        df_prediction = get_predictions(model, X_test, actual_test)
+        df_prediction = get_predictions(model, X_test, y_test)
 
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
 
@@ -181,3 +182,37 @@ def simulate(param, case_number):
     k.get_session().close()
     k.clear_session()
     tf.reset_default_graph()
+
+
+def get_portfolio(param, quantile):
+    """
+    상위 m분위의 종목으로 Portfolio 구성
+    """
+    print("Param: {}".format(param))
+
+    tf.logging.set_verbosity(3)
+    # TensorFlow wizardry
+    config = tf.ConfigProto()
+    # Don't pre-allocate memory; allocate as-needed
+    config.gpu_options.allow_growth = True
+    # Create a session with the above options specified.
+    k.set_session(tf.Session(config=config))
+
+    file_name = get_file_name(param)
+    test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
+    month = sorted(test_pf[DATE].unique())[:-1]
+
+    model, X_test, y_test = train_model(month, param)
+
+    df_prediction = get_predictions(model, X_test, y_test)
+
+    # 데이터셋 준비
+
+
+    # 모델 준비
+
+    # 모델 학습
+
+    # 다음 수익률 예측
+
+    # 포트폴리오 구성

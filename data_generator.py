@@ -35,14 +35,20 @@ def get_data_set(portfolio, rolling_columns):
 def save_all():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio(start_date=START_DATE)
+    training_portfolio = Portfolio(start_date=START_DATE)
     # 최소 시가총액 100억
-    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    training_portfolio = training_portfolio.loc[training_portfolio[MKTCAP] > 10000000000, :]
+    # 모델 학습 및 백테스트용
     # RET_1이 존재하지 않는 마지막 달 제거
-    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    all_set = get_data_set(all_portfolio, rolling_columns)
-    all_set.to_csv('data/all.csv', index=False)
+    training_portfolio = training_portfolio.loc[~pd.isna(training_portfolio[RET_1]), :]
+    training_set = get_data_set(training_portfolio, rolling_columns)
+    training_set.to_csv('data/all.csv', index=False)
 
+    # 실제 포트폴리오용
+    # RET_1이 존재하지 않는 마지막 달만 사용
+    real_portfolio = training_portfolio.loc[pd.isna(training_portfolio[RET_1]), :]
+    real_set = get_data_set(real_portfolio, rolling_columns)
+    real_set.to_csv('data/all_real.csv', index=False)
 
 def save_filter():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
@@ -87,6 +93,6 @@ def save_bollinger():
 
 
 if __name__ == '__main__':
-    # save_all()
-    save_filter()
+    save_all()
+    # save_filter()
     # save_bollinger()
