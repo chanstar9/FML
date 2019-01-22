@@ -6,7 +6,6 @@
 import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 # DATA_SET
@@ -18,18 +17,14 @@ SECTOR = 'sector'
 START_DATE = '2007-04-30'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
-scaler = MinMaxScaler()
-
 
 def get_data_set(portfolio, rolling_columns, dummy_columns=None):
     result_columns = [DATE, CODE, RET_1]
-    scaled_columns = []
-    data_set = portfolio.reset_index(drop=True)
+    data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
     for column in rolling_columns:
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
-            scaled_columns.append(column_i)
             data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
 
     if dummy_columns is not None:
@@ -37,7 +32,6 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None):
 
     data_set = data_set[result_columns]
     data_set = data_set.dropna().reset_index(drop=True)
-    data_set[scaled_columns] = scaler.fit_transform(data_set[scaled_columns])
 
     return data_set
 
@@ -84,8 +78,8 @@ def save_bollinger():
     # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
 
-    # Bollinger (last 20개월 평균종가보다 낮은 종목)
-    all_portfolio = all_portfolio.sort_values(by=[NAME]).reset_index(drop=True)
+    # Bollinger
+    all_portfolio = all_portfolio.sort_values(by=[NAME, DATE]).reset_index(drop=True)
     all_portfolio['mean'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).mean().reset_index(drop=True)
     all_portfolio['std'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).std().reset_index(drop=True)
     all_portfolio[BOLLINGER] = all_portfolio['mean'] - 2 * all_portfolio['std']
