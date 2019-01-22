@@ -82,13 +82,12 @@ def get_geometric_ensemble_predictions(predictions, quantile: int = 40):
 
 
 def select_predictions(predictions, quantile, columns):
-    labels = range(1, quantile + 1)
     selected_predictions = []
     for prediction in predictions:
-        prediction[QUANTILE] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
-            lambda x: pd.qcut(x, quantile, labels=labels)
+        prediction[RANK] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
+            lambda x: x.rank(ascending=False, pct=True)
         )
-        selected_predictions.append(prediction.loc[prediction[QUANTILE] == quantile, columns])
+        selected_predictions.append(prediction.loc[prediction[RANK] <= (1 / quantile), columns])
     return selected_predictions
 
 
@@ -384,12 +383,45 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
 
 if __name__ == '__main__':
     models = [
+        # 'NN3_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'NN3_2-all-linear-he_uniform-glorot_uniform-none',
         'NN3_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'NN3_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_1-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_2-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_2-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_3-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_4-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_4-all-relu-he_uniform-glorot_uniform-none-0.5',
         'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_1-all-relu-he_uniform-glorot_uniform-none',
         'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_2-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_3-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_4-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
     ]
     methods = [
         INTERSECTION,
         GEOMETRIC
     ]
-    compare_ensemble(methods, models, show_plot=False)
+    compare_ensemble(methods, models, show_plot=True)
