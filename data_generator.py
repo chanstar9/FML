@@ -44,6 +44,8 @@ def save_all():
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/all.csv', index=False)
 
@@ -56,6 +58,8 @@ def save_filter():
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
     # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
     all_portfolio = all_portfolio.loc[(all_portfolio[PER] < 10) & (all_portfolio[PER] > 2)]
     # 0.2 < PBR < 1.0
@@ -77,11 +81,12 @@ def save_bollinger():
     all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
     # RET_1이 존재하지 않는 마지막 달 제거
     all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
 
     # Bollinger
-    all_portfolio = all_portfolio.sort_values(by=[NAME, DATE]).reset_index(drop=True)
-    all_portfolio['mean'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).mean().reset_index(drop=True)
-    all_portfolio['std'] = all_portfolio.groupby(NAME)[ENDP].rolling(20).std().reset_index(drop=True)
+    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    all_portfolio['mean'] = all_portfolio.groupby(CODE)[ENDP].rolling(20).mean().reset_index(drop=True)
+    all_portfolio['std'] = all_portfolio.groupby(CODE)[ENDP].rolling(20).std().reset_index(drop=True)
     all_portfolio[BOLLINGER] = all_portfolio['mean'] - 2 * all_portfolio['std']
     bollingers = all_portfolio.loc[all_portfolio[ENDP] < all_portfolio[BOLLINGER], [DATE, CODE]]
 
@@ -96,8 +101,14 @@ def save_sector():
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
     all_portfolio = Portfolio()
-    # sector를 one_hot_encoding
+    # 최소 시가총액 100억
+    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
+    # RET_1이 존재하지 않는 마지막 달 제거
+    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    # KRX_SECTOR가 존재하지 않는 데이터 제거
     all_portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
+    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
     # sector를 숫자로 나타냄
     label_encoder = LabelEncoder()
     labeled_sector = label_encoder.fit_transform(all_portfolio[KRX_SECTOR])
@@ -106,7 +117,7 @@ def save_sector():
     one_hot_encoder = OneHotEncoder(sparse=False)
     one_hot_encoded_sector = one_hot_encoder.fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
     # 기존 데이터에 붙히기
-    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors)
+    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors).reset_index(drop=True)
     all_portfolio[krx_sectors] = df_one_hot_encoded_sector
     # 데이터 생성하기
     all_set = get_data_set(all_portfolio, rolling_columns, dummy_columns=krx_sectors)
