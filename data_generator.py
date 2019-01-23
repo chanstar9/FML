@@ -14,7 +14,7 @@ FILTER = 'filter'
 BOLLINGER = 'bollinger'
 SECTOR = 'sector'
 
-START_DATE = '2007-04-30'
+START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 

@@ -14,12 +14,12 @@ if __name__ == '__main__':
             DATA_SET: ALL,
             BATCH_SIZE: 300,
             EPOCHS: 100,
-            ACTIVATION: RELU,
+            ACTIVATION: LINEAR,
             BIAS_INITIALIZER: HE_UNIFORM,
             KERNEL_INITIALIZER: GLOROT_UNIFORM,
             BIAS_REGULARIZER: NONE,
-            HIDDEN_LAYER: DNN5_4,
-            DROPOUT: True,
+            HIDDEN_LAYER: NN3_1,
+            DROPOUT: False,
             DROPOUT_RATE: 0.5
         }, case_number=i)
         gc.collect()
