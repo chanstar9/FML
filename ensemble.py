@@ -22,7 +22,10 @@ COUNT = 'count'
 
 RANK = 'rank'
 CORRECT = 'correct'
-ACCURACY = 'accuracy'
+RIGID_ACCURACY = 'rigid_accuracy'
+DECILE_ACCURACY = 'decile_accuracy'
+QUARTER_ACCURACY = 'quarter_accuracy'
+HALF_ACCURACY = 'half_accuracy'
 
 
 def get_intersection_ensemble_predictions(predictions, quantile: int = 40):
@@ -79,13 +82,12 @@ def get_geometric_ensemble_predictions(predictions, quantile: int = 40):
 
 
 def select_predictions(predictions, quantile, columns):
-    labels = range(1, quantile + 1)
     selected_predictions = []
     for prediction in predictions:
-        prediction[QUANTILE] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
-            lambda x: pd.qcut(x, quantile, labels=labels)
+        prediction[RANK] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
+            lambda x: x.rank(ascending=False, pct=True)
         )
-        selected_predictions.append(prediction.loc[prediction[QUANTILE] == quantile, columns])
+        selected_predictions.append(prediction.loc[prediction[RANK] <= (1 / quantile), columns])
     return selected_predictions
 
 
@@ -130,7 +132,7 @@ def _get_file_name(method: str, model_name: str, quantile: int = 40) -> str:
 def _calculate_accuracy(ensemble_portfolio, predictions, quantile):
     ensemble_portfolio[DATE] = pd.to_datetime(ensemble_portfolio[DATE])
 
-    selected_predictions = select_predictions(predictions, quantile, [DATE, CODE])
+    selected_predictions = select_predictions(predictions[:1], quantile, [DATE, CODE])
     selected_prediction_count = selected_predictions[0].groupby(by=DATE).count()
     selected_prediction_count.rename(columns={CODE: COUNT}, inplace=True)
     selected_prediction_count.reset_index(drop=False, inplace=True)
@@ -167,7 +169,10 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         ACTIVE_RISK         | (float)
         IR                  | (float)
         CAGR                | (float)
-        ACCURACY            | (float)
+        RIGID_ACCURACY      | (float)
+        DECILE_ACCURACY     | (float)
+        QUARTER_ACCURACY    | (float)
+        HALF_ACCURACY       | (float)
     :return ensemble_portfolios: ([Portfolio])
         DATE                | (datetime)
         CODE                | (str)
@@ -215,8 +220,14 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     active_risks = [ensemble_outcome[ACTIVE_RISK] for ensemble_outcome in ensemble_outcomes]
     information_ratios = [ensemble_outcome[IR] for ensemble_outcome in ensemble_outcomes]
     CAGRs = [ensemble_outcome[CAGR] for ensemble_outcome in ensemble_outcomes]
-    accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, quantile) for
-                  ensemble_portfolio in ensemble_portfolios]
+    rigid_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, quantile) for
+                        ensemble_portfolio in ensemble_portfolios]
+    decile_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 10) for
+                         ensemble_portfolio in ensemble_portfolios]
+    quarter_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 4) for
+                          ensemble_portfolio in ensemble_portfolios]
+    half_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 2) for
+                       ensemble_portfolio in ensemble_portfolios]
 
     ensemble_summary = pd.DataFrame({
         PORTFOLIO_RETURN: portfolio_returns,
@@ -224,7 +235,10 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         ACTIVE_RISK: active_risks,
         IR: information_ratios,
         CAGR: CAGRs,
-        ACCURACY: accuracies,
+        RIGID_ACCURACY: rigid_accuracies,
+        DECILE_ACCURACY: decile_accuracies,
+        QUARTER_ACCURACY: quarter_accuracies,
+        HALF_ACCURACY: half_accuracies,
     }, index=ensemble_numbers.columns)
     ensemble_summary.to_csv('summary/' + result_file_name + '.csv')
     for ensemble_prediction in ensemble_predictions:
@@ -232,29 +246,31 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
 
     # Plot
     if show_plot:
-        fig, axes = plt.subplots(nrows=3, ncols=1, figsize=(10, 12))
+        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 8))
 
+        # Company number
         ensemble_numbers.plot(ax=axes[0], colormap='Blues')
         axes[0].set_ylim(0, 50)
-        axes[0].set_title('{}:{}, Top {}-quantile'.format(method.title(), model_name, quantile),
-                          fontdict={'fontsize': 14})
+        axes[0].set_title('{}:{}, Top {}-quantile'.format(method.title(), model_name, quantile))
         axes[0].set_xlabel('Date')
         axes[0].set_ylabel('# of companies')
         axes[0].legend(loc='upper left')
 
+        # Cumulative return
         ensemble_cumulative_returns.plot(ax=axes[1], colormap='Blues')
         axes[1].set_ylim(-1, 16)
         axes[1].set_xlabel('Date')
         axes[1].set_ylabel('Return')
         axes[1].legend(loc='upper left')
 
-        ensembles = ensemble_cumulative_returns.columns
-        trend_model = np.polyfit(ensembles, information_ratios, 1)
-        get_trend = np.poly1d(trend_model)
-        axes[2].plot(ensembles, information_ratios, 'black', ensembles, get_trend(ensembles), 'r--')
-        axes[2].set_ylim(0.3, 0.5)
-        axes[2].set_xlabel('# of ensembles')
-        axes[2].set_ylabel('Information ratio')
+        # Information ratio
+        # ensembles = ensemble_cumulative_returns.columns
+        # trend_model = np.polyfit(ensembles, information_ratios, 1)
+        # get_trend = np.poly1d(trend_model)
+        # axes[2].plot(ensembles, information_ratios, 'black', ensembles, get_trend(ensembles), 'r--')
+        # axes[2].set_ylim(0.3, 0.5)
+        # axes[2].set_xlabel('# of ensembles')
+        # axes[2].set_ylabel('Information ratio')
 
         plt.savefig('summary/' + result_file_name + '.png')
         fig.show()
@@ -268,7 +284,10 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
     rank_correlations = []
     rank_p_values = []
     IRs = []
-    accuracies = []
+    rigid_accuracies = []
+    decile_accuracies = []
+    quarter_accuracies = []
+    half_accuracies = []
     kospi_larges = []
     kospi_middles = []
     kospi_smalls = []
@@ -327,7 +346,10 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
             rank_correlations.append(rankIC[0])
             rank_p_values.append(rankIC[1])
             IRs.append(ensemble_summary[IR].values[-1])
-            accuracies.append(ensemble_summary[ACCURACY].values[-1])
+            rigid_accuracies.append(ensemble_summary[RIGID_ACCURACY].values[-1])
+            decile_accuracies.append(ensemble_summary[DECILE_ACCURACY].values[-1])
+            quarter_accuracies.append(ensemble_summary[QUARTER_ACCURACY].values[-1])
+            half_accuracies.append(ensemble_summary[HALF_ACCURACY].values[-1])
             kospi_larges.append(ensemble_portfolio_ratio[KOSPI_LARGE].mean())
             kospi_middles.append(ensemble_portfolio_ratio[KOSPI_MIDDLE].mean())
             kospi_smalls.append(ensemble_portfolio_ratio[KOSPI_SMALL].mean())
@@ -341,7 +363,10 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
         'Rank corr': rank_correlations,
         'Rank p-value': rank_p_values,
         'IR': IRs,
-        'Accuracy': accuracies,
+        'Rigid accuracy': rigid_accuracies,
+        'Decile accuracy': decile_accuracies,
+        'Quarter accuracy': quarter_accuracies,
+        'Half accuracy': half_accuracies,
         'KOSPI Large': kospi_larges,
         'KOSPI Middle': kospi_middles,
         'KOSPI Small': kospi_smalls,
@@ -358,8 +383,46 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
 
 if __name__ == '__main__':
     models = [
+        'NN3_1-all-linear-he_uniform-glorot_uniform-none',
+        'NN3_2-all-linear-he_uniform-glorot_uniform-none',
         'NN3_3-all-linear-he_uniform-glorot_uniform-none',
+        'NN3_4-all-linear-he_uniform-glorot_uniform-none',
+        'DNN5_1-all-linear-he_uniform-glorot_uniform-none',
+        'DNN5_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_1-all-relu-he_uniform-glorot_uniform-none',
+        'DNN5_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_2-all-linear-he_uniform-glorot_uniform-none',
+        'DNN5_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_2-all-relu-he_uniform-glorot_uniform-none',
+        'DNN5_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_3-all-linear-he_uniform-glorot_uniform-none',
+        'DNN5_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_3-all-relu-he_uniform-glorot_uniform-none',
+        'DNN5_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_4-all-linear-he_uniform-glorot_uniform-none',
+        'DNN5_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN5_4-all-relu-he_uniform-glorot_uniform-none',
+        'DNN5_4-all-relu-he_uniform-glorot_uniform-none-0.5',
         'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
         'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_1-all-relu-he_uniform-glorot_uniform-none',
+        'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_2-all-relu-he_uniform-glorot_uniform-none',
+        'DNN8_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_3-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_3-all-relu-he_uniform-glorot_uniform-none',
+        'DNN8_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_4-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        'DNN8_4-all-relu-he_uniform-glorot_uniform-none',
+        'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
     ]
-    compare_ensemble(METHODS, models, show_plot=False)
+    methods = [
+        INTERSECTION,
+        GEOMETRIC
+    ]
+    compare_ensemble(methods, models, show_plot=True)

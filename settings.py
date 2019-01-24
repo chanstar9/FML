@@ -3,10 +3,11 @@
 :Author: Jaekyoung Kim
 :Date: 2018. 9. 28.
 """
-import pandas as pd
 from keras.activations import linear, tanh, relu
 from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
 from keras.regularizers import l1, l2, l1_l2
+
+from data_generator import *
 
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
@@ -18,14 +19,6 @@ BIAS_REGULARIZER = 'bias_regularizer'
 HIDDEN_LAYER = 'hidden_layer'
 DROPOUT = 'dropout'
 DROPOUT_RATE = 'dropout_rate'
-
-# DATA_SET
-ALL = 'all'
-KOSPI = 'kospi'
-KOSDAQ = 'kosdaq'
-FILTER = 'filter'
-BOLLINGER = 'bollinger'
-SECTOR = 'sector'
 
 # ACTIVATION
 LINEAR = 'linear'
@@ -62,17 +55,24 @@ DNN8_3 = 'DNN8_3'
 DNN8_4 = 'DNN8_4'
 
 
+class LazyDict(dict):
+
+    def __getitem__(self, item):
+        function, arg = dict.__getitem__(self, item)
+        return function(arg)
+
+
 def get_data(data_name):
     data = pd.read_csv('data/{}.csv'.format(data_name), parse_dates=['date'])
     return data
 
 
-data_sets = {
-    ALL: get_data(ALL),
-    FILTER: get_data(FILTER),
-    BOLLINGER: get_data(BOLLINGER),
-    SECTOR: get_data(SECTOR)
-}
+data_sets = LazyDict({
+    ALL: (get_data, ALL),
+    FILTER: (get_data, FILTER),
+    BOLLINGER: (get_data, BOLLINGER),
+    SECTOR: (get_data, SECTOR),
+})
 
 activations = {
     LINEAR: linear,
