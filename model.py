@@ -13,7 +13,6 @@ from dateutil.relativedelta import relativedelta
 from keras import backend as k
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
-from tqdm import tqdm
 
 from settings import *
 
@@ -33,7 +32,10 @@ def get_train_test_set(data_set_key, test_month):
     training_set = get_data_set(data_set_key)
     test_set = get_data_set(data_set_key)
 
-    test_index = months.index(test_month)
+    if test_month in months:
+        test_index = months.index(test_month)
+    else:
+        test_index = len(months)
     assert test_index - USED_PAST_MONTHS - TRAINING_MONTHS >= 0, "test_month is too early"
 
     train_start_month = months[test_index - TRAINING_MONTHS]
@@ -101,6 +103,21 @@ def train_model(month, param):
     return model, X_test, y_test
 
 
+def get_file_name(param) -> str:
+    file_name = '{hidden_layer}-{data_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
+        hidden_layer=param[HIDDEN_LAYER],
+        data_set=param[DATA_SET],
+        activation=param[ACTIVATION],
+        bias_initializer=param[BIAS_INITIALIZER],
+        kernel_initializer=param[KERNEL_INITIALIZER],
+        bias_regularizer=param[BIAS_REGULARIZER],
+    )
+    if param[DROPOUT]:
+        file_name = file_name + '-{}'.format(param[DROPOUT_RATE])
+
+    return file_name
+
+
 def get_predictions(model, X, actual_y=None):
     predict_ret_1 = 'predict_' + RET_1
     actual_rank = 'actual_rank'
@@ -116,24 +133,9 @@ def get_predictions(model, X, actual_y=None):
         df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
         df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
     else:
-        pass
+        df_prediction = pd.DataFrame(prediction, columns=[predict_ret_1])
 
     return df_prediction
-
-
-def get_file_name(param) -> str:
-    file_name = '{hidden_layer}-{data_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
-        hidden_layer=param[HIDDEN_LAYER],
-        data_set=param[DATA_SET],
-        activation=param[ACTIVATION],
-        bias_initializer=param[BIAS_INITIALIZER],
-        kernel_initializer=param[KERNEL_INITIALIZER],
-        bias_regularizer=param[BIAS_REGULARIZER],
-    )
-    if param[DROPOUT]:
-        file_name = file_name + '-{}'.format(param[DROPOUT_RATE])
-
-    return file_name
 
 
 def simulate(param, case_number):
@@ -182,10 +184,7 @@ def simulate(param, case_number):
     tf.reset_default_graph()
 
 
-def get_portfolio(param, quantile):
-    """
-    상위 m분위의 종목으로 Portfolio 구성
-    """
+def get_forward_predict(param, quantile, model_num):
     print("Param: {}".format(param))
 
     tf.logging.set_verbosity(3)
@@ -196,21 +195,28 @@ def get_portfolio(param, quantile):
     # Create a session with the above options specified.
     k.set_session(tf.Session(config=config))
 
-    file_name = get_file_name(param)
-    test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
-    month = sorted(test_pf[DATE].unique())[:-1]
+    # get X_test
+    RECENT_DATA_SET = param[DATA_SET] + '_recent'
+    X_test = pd.read_csv('data/{}.csv'.format(RECENT_DATA_SET))
+    # save month
+    month = X_test[DATE][0]
+    codes = X_test[[CODE]]
+    X_test = X_test.drop([DATE, CODE], axis=1)
 
-    model, X_test, y_test = train_model(month, param)
+    # train model
+    model, _, _ = train_model(month, param)
 
-    df_prediction = get_predictions(model, X_test, y_test)
+    # get forward prediction
+    forward_predictions = get_predictions(model, X_test)
+    codes['predict_return_1'] = forward_predictions
+    df_forward_predictions = codes
 
-    # 데이터셋 준비
+    # ensemble
 
+    # save forward prediction
+    df_forward_predictions.to_csv('forward_predict/forward_predictions.csv')
 
-    # 모델 준비
-
-    # 모델 학습
-
-    # 다음 수익률 예측
-
-    # 포트폴리오 구성
+    # Clean up the memory
+    k.get_session().close()
+    k.clear_session()
+    tf.reset_default_graph()
