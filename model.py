@@ -13,6 +13,7 @@ from dateutil.relativedelta import relativedelta
 from keras import backend as k
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
+from keras.callbacks import EarlyStopping
 from tqdm import tqdm
 
 from settings import *
@@ -97,7 +98,9 @@ def train_model(month, param):
     model.fit(X_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
-              verbose=0)
+              verbose=0,
+              validation_data=(X_test, y_test),
+              callbacks=[EarlyStopping(patience=2)])
 
     return model, X_test, actual_test
 
