@@ -3,10 +3,12 @@
 :Author: Jaekyoung Kim
 :Date: 2018-09-21
 """
+import numpy as np
 import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from tqdm import tqdm
 
 # DATA_SET
 ALL = 'all'
@@ -18,10 +20,13 @@ START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 
-def get_data_set(portfolio, rolling_columns, dummy_columns=None):
-    result_columns = [DATE, CODE, RET_1]
+def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True):
+    if return_y:
+        result_columns = [DATE, CODE, RET_1]
+    else:
+        result_columns = [DATE, CODE]
     data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-    for column in rolling_columns:
+    for column in tqdm(rolling_columns):
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
@@ -48,6 +53,18 @@ def save_all():
 
     all_set = get_data_set(all_portfolio, rolling_columns)
     all_set.to_csv('data/all.csv', index=False)
+
+    # recent data
+    recent_portfolio = Portfolio()
+    # 최소 시가총액 100억
+    recent_portfolio = recent_portfolio.loc[recent_portfolio[MKTCAP] > 10000000000, :]
+    recent_portfolio = recent_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    recent_set = get_data_set(recent_portfolio, rolling_columns, return_y=False)
+    # 마지막 달만 사용
+    last_month = np.sort(recent_set[DATE].unique())[-1]
+    recent_set = recent_set.loc[recent_set[DATE] == last_month, :]
+
+    recent_set.to_csv('data/all_recent.csv', index=False)
 
 
 def save_filter():
