@@ -3,12 +3,12 @@
 :Author: Jaekyoung Kim
 :Date: 2018. 11. 25.
 """
-import pandas as pd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+from ksif import Portfolio
 from ksif.core.columns import *
 from ksif.core.outcomes import *
-from ksif import Portfolio
-import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
 INTERSECTION = 'intersection'
@@ -84,7 +84,7 @@ def get_geometric_ensemble_predictions(predictions, quantile: int = 40):
 def select_predictions(predictions, quantile, columns):
     selected_predictions = []
     for prediction in predictions:
-        prediction[RANK] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
+        prediction.loc[:, RANK] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
             lambda x: x.rank(ascending=False, pct=True)
         )
         selected_predictions.append(prediction.loc[prediction[RANK] <= (1 / quantile), columns])

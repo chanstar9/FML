@@ -11,11 +11,11 @@ import keras
 import tensorflow as tf
 from dateutil.relativedelta import relativedelta
 from keras import backend as k
+from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
-from keras.callbacks import EarlyStopping
-from tqdm import tqdm
 
+from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
 
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
@@ -107,6 +107,7 @@ def train_model(month, param):
 
     return model, X_test, actual_test
 
+
 def get_file_name(param) -> str:
     file_name = '{hidden_layer}-{data_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
         hidden_layer=param[HIDDEN_LAYER],
@@ -188,7 +189,7 @@ def simulate(param, case_number):
     tf.reset_default_graph()
 
 
-def get_forward_predict(param, quantile, model_num):
+def get_forward_predict(param, quantile, model_num, method):
     print("Param: {}".format(param))
 
     tf.logging.set_verbosity(3)
@@ -207,18 +208,25 @@ def get_forward_predict(param, quantile, model_num):
     codes = X_test[[CODE]]
     X_test = X_test.drop([DATE, CODE], axis=1)
 
-    # train model
-    model, _, _ = train_model(month, param)
+    predictions = []
+    for i in tqdm(range(model_num)):
+        # train model
+        model, _, _ = train_model(month, param)
 
-    # get forward prediction
-    forward_predictions = get_predictions(model, X_test)
-    codes['predict_return_1'] = forward_predictions
-    df_forward_predictions = codes
+        # get forward prediction
+        forward_predictions = get_predictions(model, X_test)
+        codes[PREDICTED_RET_1] = forward_predictions
+        df_forward_predictions = codes
+        df_forward_predictions[DATE] = month
+        predictions.append(df_forward_predictions)
 
-    # ensemble
+    # 0 = intersection / 1 = geometric
+    get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
+    ensemble_predictions = get_ensemble_predictions(predictions, quantile)
+    ensemble_predictions = ensemble_predictions[-1][CODE]
 
-    # save forward prediction
-    df_forward_predictions.to_csv('forward_predict/forward_predictions.csv')
+    # Save predictions
+    ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
 
     # Clean up the memory
     k.get_session().close()
