@@ -55,13 +55,12 @@ def train_model(month, param):
     data_train_array = data_train.values
     data_test_array = data_test.values
 
-    X_train = data_train_array[:, 3:]
+    x_train = data_train_array[:, 3:]
     y_train = data_train_array[:, 2:3]
-    X_test = data_test_array[:, 3:]
-    y_test = data_test_array[:, 2:3]
+    x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
-    input_dim = X_train.shape[1]
+    input_dim = x_train.shape[1]
 
     # Parameters
     batch_size = param[BATCH_SIZE]
@@ -98,14 +97,14 @@ def train_model(month, param):
     model.add(Dense(1))
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
-    model.fit(X_train, y_train,
+    model.fit(x_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              validation_data=(X_test, y_test),
-              callbacks=[EarlyStopping(patience=2)])
+              callbacks=[EarlyStopping(patience=2)],
+              validation_split=0.2)
 
-    return model, X_test, actual_test
+    return model, x_test, actual_test
 
 
 def get_file_name(param) -> str:
@@ -123,12 +122,12 @@ def get_file_name(param) -> str:
     return file_name
 
 
-def get_predictions(model, X, actual_y=None):
+def get_predictions(model, x_test, actual_y=None):
     predict_ret_1 = 'predict_' + RET_1
     actual_rank = 'actual_rank'
     predicted_rank = 'predicted_rank'
 
-    prediction = model.predict(X, verbose=0)
+    prediction = model.predict(x_test, verbose=0)
     if actual_y:
         df_prediction = pd.concat(
             [actual_y,
@@ -162,9 +161,9 @@ def simulate(param, case_number):
 
     df_predictions = pd.DataFrame()
     for month in tqdm(test_months):
-        model, X_test, y_test = train_model(month, param)
+        model, x_test, y_test = train_model(month, param)
 
-        df_prediction = get_predictions(model, X_test, y_test)
+        df_prediction = get_predictions(model, x_test, y_test)
 
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
 
@@ -200,21 +199,21 @@ def get_forward_predict(param, quantile, model_num, method):
     # Create a session with the above options specified.
     k.set_session(tf.Session(config=config))
 
-    # get X_test
-    RECENT_DATA_SET = param[DATA_SET] + '_recent'
-    X_test = pd.read_csv('data/{}.csv'.format(RECENT_DATA_SET))
+    # get x_test
+    recent_data_set = param[DATA_SET] + '_recent'
+    x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
     # save month
-    month = X_test[DATE][0]
-    codes = X_test[[CODE]]
-    X_test = X_test.drop([DATE, CODE], axis=1)
+    month = x_test[DATE][0]
+    codes = x_test[[CODE]]
+    x_test = x_test.drop([DATE, CODE], axis=1)
 
     predictions = []
-    for i in tqdm(range(model_num)):
+    for _ in tqdm(range(model_num)):
         # train model
         model, _, _ = train_model(month, param)
 
         # get forward prediction
-        forward_predictions = get_predictions(model, X_test)
+        forward_predictions = get_predictions(model, x_test)
         codes[PREDICTED_RET_1] = forward_predictions
         df_forward_predictions = codes
         df_forward_predictions[DATE] = month
