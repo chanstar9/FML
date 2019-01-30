@@ -11,10 +11,11 @@ import keras
 import tensorflow as tf
 from dateutil.relativedelta import relativedelta
 from keras import backend as k
+from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
-from tqdm import tqdm
 
+from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
 
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
@@ -33,7 +34,10 @@ def get_train_test_set(data_set_key, test_month):
     training_set = get_data_set(data_set_key)
     test_set = get_data_set(data_set_key)
 
-    test_index = months.index(test_month)
+    if test_month in months:
+        test_index = months.index(test_month)
+    else:
+        test_index = len(months)
     assert test_index - USED_PAST_MONTHS - TRAINING_MONTHS >= 0, "test_month is too early"
 
     train_start_month = months[test_index - TRAINING_MONTHS]
@@ -51,13 +55,12 @@ def train_model(month, param):
     data_train_array = data_train.values
     data_test_array = data_test.values
 
-    X_train = data_train_array[:, 3:]
+    x_train = data_train_array[:, 3:]
     y_train = data_train_array[:, 2:3]
-    X_test = data_test_array[:, 3:]
-    y_test = data_test_array[:, 2:3]
+    x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
-    input_dim = X_train.shape[1]
+    input_dim = x_train.shape[1]
 
     # Parameters
     batch_size = param[BATCH_SIZE]
@@ -94,30 +97,14 @@ def train_model(month, param):
     model.add(Dense(1))
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
-    model.fit(X_train, y_train,
+    model.fit(x_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              validation_data=(X_test, y_test))
+              callbacks=[EarlyStopping(patience=2)],
+              validation_split=0.2)
 
-    return model, X_test, actual_test
-
-
-def get_predictions(model, X, actual_y):
-    predict_ret_1 = 'predict_' + RET_1
-    actual_rank = 'actual_rank'
-    predicted_rank = 'predicted_rank'
-
-    prediction = model.predict(X, verbose=0)
-    df_prediction = pd.concat(
-        [actual_y,
-         pd.DataFrame(prediction, columns=[predict_ret_1])],
-        axis=1)
-    df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
-    df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
-    df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
-
-    return df_prediction
+    return model, x_test, actual_test
 
 
 def get_file_name(param) -> str:
@@ -133,6 +120,26 @@ def get_file_name(param) -> str:
         file_name = file_name + '-{}'.format(param[DROPOUT_RATE])
 
     return file_name
+
+
+def get_predictions(model, x_test, actual_y=None):
+    predict_ret_1 = 'predict_' + RET_1
+    actual_rank = 'actual_rank'
+    predicted_rank = 'predicted_rank'
+
+    prediction = model.predict(x_test, verbose=0)
+    if actual_y:
+        df_prediction = pd.concat(
+            [actual_y,
+             pd.DataFrame(prediction, columns=[predict_ret_1])],
+            axis=1)
+        df_prediction['diff'] = df_prediction[RET_1] - df_prediction[predict_ret_1]
+        df_prediction[actual_rank] = df_prediction[RET_1].rank(ascending=False)
+        df_prediction[predicted_rank] = df_prediction[predict_ret_1].rank(ascending=False)
+    else:
+        df_prediction = pd.DataFrame(prediction, columns=[predict_ret_1])
+
+    return df_prediction
 
 
 def simulate(param, case_number):
@@ -154,9 +161,9 @@ def simulate(param, case_number):
 
     df_predictions = pd.DataFrame()
     for month in tqdm(test_months):
-        model, X_test, actual_test = train_model(month, param)
+        model, x_test, y_test = train_model(month, param)
 
-        df_prediction = get_predictions(model, X_test, actual_test)
+        df_prediction = get_predictions(model, x_test, y_test)
 
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
 
@@ -174,6 +181,51 @@ def simulate(param, case_number):
         ),
         index=False
     )
+
+    # Clean up the memory
+    k.get_session().close()
+    k.clear_session()
+    tf.reset_default_graph()
+
+
+def get_forward_predict(param, quantile, model_num, method):
+    print("Param: {}".format(param))
+
+    tf.logging.set_verbosity(3)
+    # TensorFlow wizardry
+    config = tf.ConfigProto()
+    # Don't pre-allocate memory; allocate as-needed
+    config.gpu_options.allow_growth = True
+    # Create a session with the above options specified.
+    k.set_session(tf.Session(config=config))
+
+    # get x_test
+    recent_data_set = param[DATA_SET] + '_recent'
+    x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
+    # save month
+    month = x_test[DATE][0]
+    codes = x_test[[CODE]]
+    x_test = x_test.drop([DATE, CODE], axis=1)
+
+    predictions = []
+    for _ in tqdm(range(model_num)):
+        # train model
+        model, _, _ = train_model(month, param)
+
+        # get forward prediction
+        forward_predictions = get_predictions(model, x_test)
+        codes[PREDICTED_RET_1] = forward_predictions
+        df_forward_predictions = codes
+        df_forward_predictions[DATE] = month
+        predictions.append(df_forward_predictions)
+
+    # 0 = intersection / 1 = geometric
+    get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
+    ensemble_predictions = get_ensemble_predictions(predictions, quantile)
+    ensemble_predictions = ensemble_predictions[-1][CODE]
+
+    # Save predictions
+    ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
 
     # Clean up the memory
     k.get_session().close()

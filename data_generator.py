@@ -3,10 +3,12 @@
 :Author: Jaekyoung Kim
 :Date: 2018-09-21
 """
+import numpy as np
 import pandas as pd
 from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from tqdm import tqdm
 
 # DATA_SET
 ALL = 'all'
@@ -14,14 +16,19 @@ FILTER = 'filter'
 BOLLINGER = 'bollinger'
 SECTOR = 'sector'
 
+TRADING_CAPITAL = 'trading_capital'
+
 START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 
-def get_data_set(portfolio, rolling_columns, dummy_columns=None):
-    result_columns = [DATE, CODE, RET_1]
+def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True):
+    if return_y:
+        result_columns = [DATE, CODE, RET_1]
+    else:
+        result_columns = [DATE, CODE]
     data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-    for column in rolling_columns:
+    for column in tqdm(rolling_columns):
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
@@ -36,63 +43,81 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None):
     return data_set
 
 
+def save_data(portfolio: Portfolio, data_name: str, rolling_columns: list, dummy_columns: list = None,
+              filtering_dataframe=None):
+    print("Start saving {}...".format(data_name))
+
+    portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
+    # old data
+    # RET_1이 존재하지 않는 마지막 달 제거
+    old_portfolio = portfolio.loc[~pd.isna(portfolio[RET_1]), :]
+    old_set = get_data_set(old_portfolio, rolling_columns, dummy_columns)
+
+    # recent data
+    recent_set = get_data_set(portfolio, rolling_columns, dummy_columns, return_y=False)
+    # 마지막 달만 사용
+    last_month = np.sort(recent_set[DATE].unique())[-1]
+    recent_set = recent_set.loc[recent_set[DATE] == last_month, :]
+
+    if isinstance(filtering_dataframe, pd.DataFrame) and not filtering_dataframe.empty:
+        filtering_dataframe = filtering_dataframe[[DATE, CODE]]
+        old_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
+        recent_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
+
+    old_set.to_csv('data/{}.csv'.format(data_name), index=False)
+    recent_set.to_csv('data/{}_recent.csv'.format(data_name), index=False)
+
+
 def save_all():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio()
+    portfolio = Portfolio()
     # 최소 시가총액 100억
-    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
-    # RET_1이 존재하지 않는 마지막 달 제거
-    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
 
-    all_set = get_data_set(all_portfolio, rolling_columns)
-    all_set.to_csv('data/all.csv', index=False)
+    save_data(portfolio, ALL, rolling_columns)
 
 
 def save_filter():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio()
+    portfolio = Portfolio()
     # 최소 시가총액 100억
-    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
-    # RET_1이 존재하지 않는 마지막 달 제거
-    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
     # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
-    all_portfolio = all_portfolio.loc[(all_portfolio[PER] < 10) & (all_portfolio[PER] > 2)]
+    portfolio = portfolio.loc[(portfolio[PER] < 10) & (portfolio[PER] > 2)]
     # 0.2 < PBR < 1.0
-    all_portfolio = all_portfolio.loc[(all_portfolio[PBR] < 1) & (all_portfolio[PBR] > 0.2)]
+    portfolio = portfolio.loc[(portfolio[PBR] < 1) & (portfolio[PBR] > 0.2)]
     # 2 < PCR < 8
-    all_portfolio = all_portfolio.loc[(all_portfolio[PCR] < 8) & (all_portfolio[PCR] > 2)]
+    portfolio = portfolio.loc[(portfolio[PCR] < 8) & (portfolio[PCR] > 2)]
     # 0 < PSR < 0.8
-    all_portfolio = all_portfolio.loc[all_portfolio[PSR] < 0.8]
+    portfolio = portfolio.loc[portfolio[PSR] < 0.8]
 
-    all_set = get_data_set(all_portfolio, rolling_columns)
-    all_set.to_csv('data/filter.csv', index=False)
+    save_data(portfolio, FILTER, rolling_columns)
 
 
 def save_bollinger():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    all_portfolio = Portfolio()
+    portfolio = Portfolio()
     # 최소 시가총액 100억
-    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
-    # RET_1이 존재하지 않는 마지막 달 제거
-    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
-    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
 
     # Bollinger
-    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-    all_portfolio['mean'] = all_portfolio.groupby(CODE)[ENDP].rolling(20).mean().reset_index(drop=True)
-    all_portfolio['std'] = all_portfolio.groupby(CODE)[ENDP].rolling(20).std().reset_index(drop=True)
-    all_portfolio[BOLLINGER] = all_portfolio['mean'] - 2 * all_portfolio['std']
-    bollingers = all_portfolio.loc[all_portfolio[ENDP] < all_portfolio[BOLLINGER], [DATE, CODE]]
+    portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    portfolio['mean'] = portfolio.groupby(CODE)[ENDP].rolling(20).mean().reset_index(drop=True)
+    portfolio['std'] = portfolio.groupby(CODE)[ENDP].rolling(20).std().reset_index(drop=True)
+    portfolio[BOLLINGER] = portfolio['mean'] - 2 * portfolio['std']
+    bollingers = portfolio.loc[portfolio[ENDP] < portfolio[BOLLINGER], [DATE, CODE]]
 
-    all_set = get_data_set(all_portfolio, rolling_columns)
-    all_set = pd.merge(all_set, bollingers, on=[DATE, CODE])
-    all_set.to_csv('data/bollinger.csv', index=False)
+    save_data(portfolio, BOLLINGER, rolling_columns, filtering_dataframe=bollingers)
 
 
 def save_sector():
@@ -100,28 +125,28 @@ def save_sector():
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
     columns.extend(rolling_columns)
-    all_portfolio = Portfolio()
+    portfolio = Portfolio()
     # 최소 시가총액 100억
-    all_portfolio = all_portfolio.loc[all_portfolio[MKTCAP] > 10000000000, :]
-    # RET_1이 존재하지 않는 마지막 달 제거
-    all_portfolio = all_portfolio.loc[~pd.isna(all_portfolio[RET_1]), :]
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+
     # KRX_SECTOR가 존재하지 않는 데이터 제거
-    all_portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
-    all_portfolio = all_portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+    portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
+    portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
 
     # sector를 숫자로 나타냄
     label_encoder = LabelEncoder()
-    labeled_sector = label_encoder.fit_transform(all_portfolio[KRX_SECTOR])
+    labeled_sector = label_encoder.fit_transform(portfolio[KRX_SECTOR])
     krx_sectors = label_encoder.classes_
     # 숫자로 나타낸 것을 모스부호로 표현
     one_hot_encoder = OneHotEncoder(sparse=False)
     one_hot_encoded_sector = one_hot_encoder.fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
     # 기존 데이터에 붙히기
     df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors).reset_index(drop=True)
-    all_portfolio[krx_sectors] = df_one_hot_encoded_sector
-    # 데이터 생성하기
-    all_set = get_data_set(all_portfolio, rolling_columns, dummy_columns=krx_sectors)
-    all_set.to_csv('data/sector.csv', index=False)
+    portfolio[krx_sectors] = df_one_hot_encoded_sector
+
+    save_data(portfolio, SECTOR, rolling_columns, krx_sectors)
 
 
 if __name__ == '__main__':
