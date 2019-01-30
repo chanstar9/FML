@@ -13,6 +13,8 @@ from dateutil.relativedelta import relativedelta
 from keras import backend as k
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
+from keras.callbacks import EarlyStopping
+from tqdm import tqdm
 
 from settings import *
 
@@ -56,7 +58,8 @@ def train_model(month, param):
     X_train = data_train_array[:, 3:]
     y_train = data_train_array[:, 2:3]
     X_test = data_test_array[:, 3:]
-    y_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+    y_test = data_test_array[:, 2:3]
+    actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
     input_dim = X_train.shape[1]
 
@@ -98,10 +101,11 @@ def train_model(month, param):
     model.fit(X_train, y_train,
               batch_size=batch_size,
               epochs=epochs,
-              verbose=0)
+              verbose=0,
+              validation_data=(X_test, y_test),
+              callbacks=[EarlyStopping(patience=2)])
 
-    return model, X_test, y_test
-
+    return model, X_test, actual_test
 
 def get_file_name(param) -> str:
     file_name = '{hidden_layer}-{data_set}-{activation}-{bias_initializer}-{kernel_initializer}-{bias_regularizer}'.format(
