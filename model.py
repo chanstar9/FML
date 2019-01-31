@@ -129,7 +129,7 @@ def get_predictions(model, x_test, actual_y=None):
     predicted_rank = 'predicted_rank'
 
     prediction = model.predict(x_test, verbose=0)
-    if actual_y:
+    if isinstance(actual_y, pd.DataFrame):
         df_prediction = pd.concat(
             [actual_y,
              pd.DataFrame(prediction, columns=[predict_ret_1])],
