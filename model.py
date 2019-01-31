@@ -21,10 +21,11 @@ from settings import *
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
 TRAIN_START_DATE = (
-        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=USED_PAST_MONTHS + TRAINING_MONTHS + 1)
+        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
 ).strftime('%Y-%m-%d')
 
 pf = Portfolio()
+pf = pf[pf[DATE] >= START_DATE]
 months = sorted(pf[DATE].unique())[:-1]
 
 result_columns = [RET_1]
@@ -38,9 +39,9 @@ def get_train_test_set(data_set_key, test_month):
         test_index = months.index(test_month)
     else:
         test_index = len(months)
-    assert test_index - USED_PAST_MONTHS - TRAINING_MONTHS >= 0, "test_month is too early"
+    assert test_index - TRAINING_MONTHS - 1 >= 0, "test_month is too early"
 
-    train_start_month = months[test_index - TRAINING_MONTHS]
+    train_start_month = months[test_index - TRAINING_MONTHS - 1]
 
     training_set = training_set.loc[(training_set[DATE] >= train_start_month) & (training_set[DATE] < test_month), :]
     test_set = test_set.loc[test_set[DATE] == test_month, :]
@@ -101,7 +102,7 @@ def train_model(month, param):
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              callbacks=[EarlyStopping(patience=2)],
+              callbacks=[EarlyStopping(patience=5)],
               validation_split=0.2)
 
     return model, x_test, actual_test
