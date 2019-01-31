@@ -278,7 +278,7 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     return ensemble_summary, ensemble_portfolios
 
 
-def compare_ensemble(methods, models, to_csv=True, show_plot=False):
+def compare_ensemble(methods, models, quantile, to_csv=True, show_plot=False):
     file_names = []
     CAGRs = []
     rank_correlations = []
@@ -319,7 +319,9 @@ def compare_ensemble(methods, models, to_csv=True, show_plot=False):
 
     for method in methods:
         for model in models:
-            ensemble_summary, ensemble_portfolios = get_ensemble(method, model, show_plot=show_plot)
+            ensemble_summary, ensemble_portfolios = get_ensemble(
+                method, model_name=model, quantile=quantile, show_plot=show_plot
+            )
             ensemble_portfolio = pd.merge(ensemble_portfolios[-1], firms, on=[DATE, CODE])
             ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(DATE).count()
             ensemble_portfolio_count.rename(columns={CODE: COUNT}, inplace=True)
@@ -425,4 +427,4 @@ if __name__ == '__main__':
         INTERSECTION,
         GEOMETRIC
     ]
-    compare_ensemble(methods, models, show_plot=True)
+    compare_ensemble(methods, models, 20, show_plot=True)
