@@ -13,6 +13,7 @@ if __name__ == '__main__':
         simulate(param={
             DATA_SET: ALL,
             BATCH_SIZE: 300,
+            EPOCHS: 100,
             ACTIVATION: LINEAR,
             BIAS_INITIALIZER: HE_UNIFORM,
             KERNEL_INITIALIZER: GLOROT_UNIFORM,
