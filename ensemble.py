@@ -10,6 +10,7 @@ from ksif import Portfolio
 from ksif.core.columns import *
 from ksif.core.outcomes import *
 from scipy.stats import spearmanr
+from tqdm import tqdm
 
 INTERSECTION = 'intersection'
 GEOMETRIC = 'geometric'
@@ -278,7 +279,8 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     return ensemble_summary, ensemble_portfolios
 
 
-def compare_ensemble(methods, models, quantile, to_csv=True, show_plot=False):
+def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9, step: int = 1, quantile: int = 40,
+                     to_csv: bool = True, show_plot: bool = False):
     file_names = []
     CAGRs = []
     rank_correlations = []
@@ -318,9 +320,10 @@ def compare_ensemble(methods, models, quantile, to_csv=True, show_plot=False):
             ]
 
     for method in methods:
-        for model in models:
+        for model in tqdm(models):
             ensemble_summary, ensemble_portfolios = get_ensemble(
-                method, model_name=model, quantile=quantile, show_plot=show_plot
+                method, model_name=model, start_number=start_number, end_number=end_number, step=step,
+                quantile=quantile, show_plot=show_plot
             )
             ensemble_portfolio = pd.merge(ensemble_portfolios[-1], firms, on=[DATE, CODE])
             ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(DATE).count()
@@ -424,7 +427,6 @@ if __name__ == '__main__':
         'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
     ]
     methods = [
-        INTERSECTION,
-        GEOMETRIC
+        INTERSECTION
     ]
-    compare_ensemble(methods, models, 20, show_plot=True)
+    compare_ensemble(methods, models, start_number=0, end_number=9, step=1, quantile=10, to_csv=True, show_plot=True)

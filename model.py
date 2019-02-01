@@ -11,9 +11,10 @@ import keras
 import tensorflow as tf
 from dateutil.relativedelta import relativedelta
 from keras import backend as k
-from keras.callbacks import EarlyStopping
+# from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
+from multiprocessing import Pool
 
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
@@ -102,7 +103,7 @@ def train_model(month, param):
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              callbacks=[EarlyStopping(patience=5)],
+              # callbacks=[EarlyStopping(patience=2)],
               validation_split=0.2)
 
     return model, x_test, actual_test
@@ -129,7 +130,7 @@ def get_predictions(model, x_test, actual_y=None):
     predicted_rank = 'predicted_rank'
 
     prediction = model.predict(x_test, verbose=0)
-    if actual_y:
+    if isinstance(actual_y, pd.DataFrame):
         df_prediction = pd.concat(
             [actual_y,
              pd.DataFrame(prediction, columns=[predict_ret_1])],
@@ -143,9 +144,22 @@ def get_predictions(model, x_test, actual_y=None):
     return df_prediction
 
 
-def simulate(param, case_number):
+def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
     print("Param: {}".format(param))
-    print("Case number: {}".format(case_number))
+    pool_num = min(max_pool, end_number - start_number + 1)
+    print("From {} to {} with {} processes.".format(start_number, end_number, pool_num))
+
+    test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
+    test_months = sorted(test_pf[DATE].unique())[:-1]
+
+    with Pool(pool_num) as p:
+        for case_number in range(start_number, end_number + 1):
+            p.apply_async(_backtest, args=(case_number, param, test_months))
+        p.close()
+        p.join()
+
+
+def _backtest(case_number: int, param: dict, test_months: list):
 
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
@@ -156,16 +170,11 @@ def simulate(param, case_number):
     k.set_session(tf.Session(config=config))
 
     file_name = get_file_name(param)
-
-    test_pf = pf.loc[pf[DATE] >= TRAIN_START_DATE, :]
-    test_months = sorted(test_pf[DATE].unique())[:-1]
-
+    desc = "#{0:2d}".format(case_number)
     df_predictions = pd.DataFrame()
-    for month in tqdm(test_months):
+    for month in tqdm(test_months, desc=desc):
         model, x_test, y_test = train_model(month, param)
-
         df_prediction = get_predictions(model, x_test, y_test)
-
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
 
     # If a directory for this model does not exist, make it.
@@ -192,14 +201,6 @@ def simulate(param, case_number):
 def get_forward_predict(param, quantile, model_num, method):
     print("Param: {}".format(param))
 
-    tf.logging.set_verbosity(3)
-    # TensorFlow wizardry
-    config = tf.ConfigProto()
-    # Don't pre-allocate memory; allocate as-needed
-    config.gpu_options.allow_growth = True
-    # Create a session with the above options specified.
-    k.set_session(tf.Session(config=config))
-
     # get x_test
     recent_data_set = param[DATA_SET] + '_recent'
     x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
@@ -208,27 +209,49 @@ def get_forward_predict(param, quantile, model_num, method):
     codes = x_test[[CODE]]
     x_test = x_test.drop([DATE, CODE], axis=1)
 
-    predictions = []
-    for _ in tqdm(range(model_num)):
-        # train model
-        model, _, _ = train_model(month, param)
+    with Pool(min(os.cpu_count(), model_num)) as p:
+        # noinspection PyTypeChecker
+        results = [p.apply_async(_get_forward_predict, t) for t in zip(
+            [codes for _ in range(model_num)],
+            [month for _ in range(model_num)],
+            [param for _ in range(model_num)],
+            [x_test for _ in range(model_num)],
+        )]
+        for r in results:
+            r.wait()
+        results = [result.get() for result in results]
+        p.close()
+        p.join()
 
-        # get forward prediction
-        forward_predictions = get_predictions(model, x_test)
-        codes[PREDICTED_RET_1] = forward_predictions
-        df_forward_predictions = codes
-        df_forward_predictions[DATE] = month
-        predictions.append(df_forward_predictions)
+        # 0 = intersection / 1 = geometric
+        get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
+        ensemble_predictions = get_ensemble_predictions(results, quantile)
 
-    # 0 = intersection / 1 = geometric
-    get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
-    ensemble_predictions = get_ensemble_predictions(predictions, quantile)
-    ensemble_predictions = ensemble_predictions[-1][CODE]
+        ensemble_predictions = ensemble_predictions[-1][CODE]
 
-    # Save predictions
-    ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
+        # Save predictions
+        ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
+
+
+def _get_forward_predict(codes, month, param, x_test):
+    tf.logging.set_verbosity(3)
+    # TensorFlow wizardry
+    config = tf.ConfigProto()
+    # Don't pre-allocate memory; allocate as-needed
+    config.gpu_options.allow_growth = True
+    # Create a session with the above options specified.
+    k.set_session(tf.Session(config=config))
+
+    model, _, _ = train_model(month, param)
+    # get forward prediction
+    forward_predictions = get_predictions(model, x_test)
+    codes[PREDICTED_RET_1] = forward_predictions
+    df_forward_predictions = codes
+    df_forward_predictions[DATE] = month
 
     # Clean up the memory
     k.get_session().close()
     k.clear_session()
     tf.reset_default_graph()
+
+    return df_forward_predictions
