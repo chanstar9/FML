@@ -6,6 +6,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
+import gc
 
 import keras
 import tensorflow as tf
@@ -103,7 +104,7 @@ def train_model(month, param):
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              # callbacks=[EarlyStopping(patience=2)],
+              # callbacks=[EarlyStopping(patience=10)],
               validation_split=0.2)
 
     return model, x_test, actual_test
@@ -176,6 +177,7 @@ def _backtest(case_number: int, param: dict, test_months: list):
         model, x_test, y_test = train_model(month, param)
         df_prediction = get_predictions(model, x_test, y_test)
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
+        gc.collect()
 
     # If a directory for this model does not exist, make it.
     data_dir = 'prediction/{}'.format(file_name)
@@ -203,7 +205,7 @@ def get_forward_predict(param, quantile, model_num, method):
 
     # get x_test
     recent_data_set = param[DATA_SET] + '_recent'
-    x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
+    x_test = pd.read_hdf('data/{}.csv'.format(recent_data_set))
     # save month
     month = x_test[DATE][0]
     codes = x_test[[CODE]]

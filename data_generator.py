@@ -65,8 +65,8 @@ def save_data(portfolio: Portfolio, data_name: str, rolling_columns: list, dummy
         old_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
         recent_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
 
-    old_set.to_csv('data/{}.csv'.format(data_name), index=False)
-    recent_set.to_csv('data/{}_recent.csv'.format(data_name), index=False)
+    old_set.to_dataframe().to_hdf('data/{}.h5'.format(data_name), key='df', format='table', mode='w')
+    recent_set.to_dataframe().to_hdf('data/{}_recent.h5'.format(data_name), key='df', format='table', mode='w')
 
 
 def save_all():
@@ -150,7 +150,7 @@ def save_sector():
 
 
 if __name__ == '__main__':
-    save_all()
+    # save_all()
     save_filter()
     save_bollinger()
     save_sector()
