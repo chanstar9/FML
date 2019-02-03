@@ -63,7 +63,8 @@ class LazyDict(dict):
 
 
 def get_data(data_name):
-    data = pd.read_csv('data/{}.csv'.format(data_name), parse_dates=['date'])
+    data = pd.read_hdf('data/{}.h5'.format(data_name))
+    data[DATE] = pd.to_datetime(data[DATE])
     return data
 
 
