@@ -18,4 +18,4 @@ if __name__ == '__main__':
         HIDDEN_LAYER: DNN8_1,
         DROPOUT: False,
         DROPOUT_RATE: 0.5
-    }, start_number=10, end_number=19)
+    }, start_number=0, end_number=9, max_pool=5)
