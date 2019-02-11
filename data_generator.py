@@ -22,24 +22,12 @@ START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 
-def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, apply_scaling=True):
+def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True):
     if return_y:
         result_columns = [DATE, CODE, RET_1]
     else:
         result_columns = [DATE, CODE]
     data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-
-    # MinMaxScale
-    if apply_scaling:
-        # Return
-        data_set[RET_1] = data_set.groupby(by=[DATE])[RET_1].apply(
-            lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0)))
-
-        # Rolling columns
-        for i in rolling_columns:
-            data_set[i] = data_set.groupby(by=[DATE])[i].apply(
-                lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0)))
-
     for column in tqdm(rolling_columns):
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
