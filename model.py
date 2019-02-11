@@ -12,7 +12,7 @@ import keras
 import tensorflow as tf
 from dateutil.relativedelta import relativedelta
 from keras import backend as k
-# from keras.callbacks import EarlyStopping
+from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
 from multiprocessing import Pool
@@ -104,7 +104,7 @@ def train_model(month, param):
               batch_size=batch_size,
               epochs=epochs,
               verbose=0,
-              # callbacks=[EarlyStopping(patience=10)],
+              callbacks=[EarlyStopping(patience=10)],
               validation_split=0.2)
 
     return model, x_test, actual_test
