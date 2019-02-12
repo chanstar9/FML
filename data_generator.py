@@ -162,7 +162,7 @@ def save_sector():
 
 
 if __name__ == '__main__':
-    # save_all()
+    save_all()
     save_filter()
     save_bollinger()
     save_sector()
