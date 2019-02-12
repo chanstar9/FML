@@ -126,7 +126,7 @@ def _cumulate(ret):
     return ret
 
 
-def _get_file_name(method: str, model_name: str, quantile: int = 40) -> str:
+def _get_file_name(method: str, model_name: str, quantile: int) -> str:
     result_file_name = '{}/{}-{}'.format(method.lower(), quantile, model_name)
     return result_file_name
 
@@ -351,7 +351,7 @@ def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9
             ensemble_portfolio_ratio[KOSDAQ_SMALL] \
                 = ensemble_portfolio_ratio[KOSDAQ_SMALL] / ensemble_portfolio_ratio[COUNT]
 
-            file_names.append(_get_file_name(method, model))
+            file_names.append(_get_file_name(method, model, quantile))
             CAGRs.append(ensemble_summary[CAGR].values[-1])
             rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
             rank_correlations.append(rankIC[0])
