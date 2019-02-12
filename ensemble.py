@@ -307,7 +307,7 @@ def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9
             [DATE, CODE, MKTCAP, EXCHANGE]]
     firms[DATE] = pd.to_datetime(firms[DATE])
 
-    firms[RANK] = firms[[DATE, MKTCAP]].groupby(DATE).rank(ascending=False)
+    firms[RANK] = firms[[DATE, EXCHANGE, MKTCAP]].groupby([DATE, EXCHANGE]).rank(ascending=False)
     firms[KOSPI_LARGE] = firms.apply(
         lambda row: 1 if (row[EXCHANGE] == '유가증권시장') and (row[RANK] <= 100) else 0, axis=1)
     firms[KOSPI_MIDDLE] = firms.apply(
