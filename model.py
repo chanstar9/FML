@@ -160,7 +160,7 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list):
+def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True):
 
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
@@ -175,6 +175,17 @@ def _backtest(case_number: int, param: dict, test_months: list):
     df_predictions = pd.DataFrame()
     for month in tqdm(test_months, desc=desc):
         model, x_test, y_test = train_model(month, param)
+
+        # MinMaxScaling x_test
+        if x_test_scaling:
+            minmaxscaling = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
+            for i, j in enumerate(x_test):
+                x_test[i] = minmaxscaling(j)
+
+        # MinMaxScaling y_test
+        if y_test_scaling:
+            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min())/(y_test[RET_1].max() - y_test[RET_1].min())
+
         df_prediction = get_predictions(model, x_test, y_test)
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
         gc.collect()
@@ -200,7 +211,7 @@ def _backtest(case_number: int, param: dict, test_months: list):
     tf.reset_default_graph()
 
 
-def get_forward_predict(param, quantile, model_num, method):
+def get_forward_predict(param, quantile, model_num, method, x_test_scaling=True):
     print("Param: {}".format(param))
 
     # get x_test
@@ -210,6 +221,12 @@ def get_forward_predict(param, quantile, model_num, method):
     month = x_test[DATE][0]
     codes = x_test[[CODE]]
     x_test = x_test.drop([DATE, CODE], axis=1)
+
+    # MinMaxScaling x_test
+    if x_test_scaling:
+        minmaxscaling = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
+        for i, j in enumerate(x_test):
+            x_test[i] = minmaxscaling(j)
 
     with Pool(min(os.cpu_count(), model_num)) as p:
         # noinspection PyTypeChecker
