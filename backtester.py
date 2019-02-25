@@ -8,7 +8,7 @@ from settings import *
 
 if __name__ == '__main__':
     backtest(param={
-        DATA_SET: ALL,
+        DATA_SET: MACRO,
         BATCH_SIZE: 300,
         EPOCHS: 100,
         ACTIVATION: LINEAR,
@@ -18,4 +18,4 @@ if __name__ == '__main__':
         HIDDEN_LAYER: DNN8_1,
         DROPOUT: False,
         DROPOUT_RATE: 0.5
-    }, start_number=0, end_number=9, max_pool=5)
+    }, start_number=0, end_number=9, max_pool=3)
