@@ -33,7 +33,7 @@ months = sorted(pf[DATE].unique())[:-1]
 result_columns = [RET_1]
 
 
-def get_train_test_set(data_set_key, test_month):
+def get_train_test_set(data_set_key, test_month, progressive_learning):
     training_set = get_data_set(data_set_key)
     test_set = get_data_set(data_set_key)
 
@@ -48,22 +48,31 @@ def get_train_test_set(data_set_key, test_month):
     training_set = training_set.loc[(training_set[DATE] >= train_start_month) & (training_set[DATE] < test_month), :]
     test_set = test_set.loc[test_set[DATE] == test_month, :]
 
-    return training_set, test_set
+    if progressive_learning:
+        training_sets = [
+            training_set.loc[(training_set[DATE] == months[test_index - TRAINING_MONTHS - 1 + train_month]), :]
+            for train_month in range(TRAINING_MONTHS)
+        ]
+
+    else:
+        training_sets = [training_set]
+
+    return training_sets, test_set
 
 
-def train_model(month, param):
-    data_train, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
+def train_model(month, param, progressive_learning):
+    data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month,
+                                                progressive_learning=progressive_learning)
 
-    # Make data a numpy array
-    data_train_array = data_train.values
+    data_train_arrays = [data_train.values for data_train in data_trains]
     data_test_array = data_test.values
 
-    x_train = data_train_array[:, 3:]
-    y_train = data_train_array[:, 2:3]
+    x_trains = [data_train_array[:, 3:] for data_train_array in data_train_arrays]  # for 문 돌려서 잘라주기
+    y_trains = [data_train_array[:, 2:3] for data_train_array in data_train_arrays]  # for 문 돌려서 잘라주기
     x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
-    input_dim = x_train.shape[1]
+    input_dim = x_trains[0].shape[1]
 
     # Parameters
     batch_size = param[BATCH_SIZE]
@@ -100,12 +109,15 @@ def train_model(month, param):
     model.add(Dense(1))
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
-    model.fit(x_train, y_train,
-              batch_size=batch_size,
-              epochs=epochs,
-              verbose=0,
-              callbacks=[EarlyStopping(patience=10)],
-              validation_split=0.2)
+    # zip([data_train_1, data_train_2, ...], [y_train_1, y_train_2, ...])
+    # -> [(data_train_1, data_test_1), (data_train_2, data_test_2), ...]
+    for x_train, y_train in zip(x_trains, y_trains):
+        model.fit(x_train, y_train,
+                  batch_size=batch_size,
+                  epochs=epochs,
+                  verbose=0,
+                  callbacks=[EarlyStopping(patience=10)],
+                  validation_split=0.2)
 
     return model, x_test, actual_test
 
@@ -160,8 +172,8 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True):
-
+def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=False, y_test_scaling=False,
+              progressive_learning=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -174,7 +186,7 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
     desc = "#{0:2d}".format(case_number)
     df_predictions = pd.DataFrame()
     for month in tqdm(test_months, desc=desc):
-        model, x_test, y_test = train_model(month, param)
+        model, x_test, y_test = train_model(month, param, progressive_learning)
 
         # MinMaxScaling x_test
         if x_test_scaling:
@@ -184,7 +196,7 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
 
         # MinMaxScaling y_test
         if y_test_scaling:
-            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min())/(y_test[RET_1].max() - y_test[RET_1].min())
+            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min()) / (y_test[RET_1].max() - y_test[RET_1].min())
 
         df_prediction = get_predictions(model, x_test, y_test)
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
@@ -211,7 +223,7 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
     tf.reset_default_graph()
 
 
-def get_forward_predict(param, quantile, model_num, method, x_test_scaling=True):
+def get_forward_predict(param, quantile, model_num, method, x_test_scaling=False):
     print("Param: {}".format(param))
 
     # get x_test
@@ -252,7 +264,7 @@ def get_forward_predict(param, quantile, model_num, method, x_test_scaling=True)
         ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
 
 
-def _get_forward_predict(codes, month, param, x_test):
+def _get_forward_predict(codes, month, param, x_test, progressive_learning=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -261,7 +273,7 @@ def _get_forward_predict(codes, month, param, x_test):
     # Create a session with the above options specified.
     k.set_session(tf.Session(config=config))
 
-    model, _, _ = train_model(month, param)
+    model, _, _ = train_model(month, param, progressive_learning)
     # get forward prediction
     forward_predictions = get_predictions(model, x_test)
     codes[PREDICTED_RET_1] = forward_predictions
