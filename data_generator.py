@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 # DATA_SET
 ALL = 'all'
+MACRO = 'macro'
 FILTER = 'filter'
 BOLLINGER = 'bollinger'
 SECTOR = 'sector'
@@ -161,8 +162,24 @@ def save_sector():
     save_data(portfolio, SECTOR, rolling_columns, krx_sectors)
 
 
+def save_macro():
+    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
+                       TERM_SPREAD_KOR, TERM_SPREAD_US, CREDIT_SPREAD_KOR, LOG_USD2KRW, LOG_CHY2KRW, LOG_EURO2KRW,
+                       TED_SPREAD, LOG_NYSE, LOG_NASDAQ, LOG_SEMI_CONDUCTOR, LOG_DOLLAR_INDEX, LOG_OIL,
+                       ]
+    portfolio = Portfolio()
+    # 최소 시가총액 100억
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+
+    save_data(portfolio, MACRO, rolling_columns)
+
+
 if __name__ == '__main__':
     save_all()
+    save_macro()
     save_filter()
     save_bollinger()
     save_sector()
