@@ -67,8 +67,8 @@ def train_model(month, param, progressive_learning):
     data_train_arrays = [data_train.values for data_train in data_trains]
     data_test_array = data_test.values
 
-    x_trains = [data_train_array[:, 3:] for data_train_array in data_train_arrays]  # for 문 돌려서 잘라주기
-    y_trains = [data_train_array[:, 2:3] for data_train_array in data_train_arrays]  # for 문 돌려서 잘라주기
+    x_trains = [data_train_array[:, 3:] for data_train_array in data_train_arrays]
+    y_trains = [data_train_array[:, 2:3] for data_train_array in data_train_arrays]
     x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
 
@@ -109,8 +109,7 @@ def train_model(month, param, progressive_learning):
     model.add(Dense(1))
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
-    # zip([data_train_1, data_train_2, ...], [y_train_1, y_train_2, ...])
-    # -> [(data_train_1, data_test_1), (data_train_2, data_test_2), ...]
+
     for x_train, y_train in zip(x_trains, y_trains):
         model.fit(x_train, y_train,
                   batch_size=batch_size,
