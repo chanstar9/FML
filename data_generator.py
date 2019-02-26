@@ -23,8 +23,8 @@ START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 
-def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, apply_scaling_return=True,
-                 apply_scaling_rolling_columns=True):
+def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, apply_scaling_return=False,
+                 apply_scaling_rolling_columns=False):
     if return_y:
         result_columns = [DATE, CODE, RET_1]
     else:
@@ -163,11 +163,12 @@ def save_sector():
 
 
 def save_macro():
-    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
-                       TERM_SPREAD_KOR, TERM_SPREAD_US, CREDIT_SPREAD_KOR, LOG_USD2KRW, LOG_CHY2KRW, LOG_EURO2KRW,
-                       TED_SPREAD, LOG_NYSE, LOG_NASDAQ, LOG_SEMI_CONDUCTOR, LOG_DOLLAR_INDEX, LOG_OIL,
-                       ]
+    rolling_columns = [
+        E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
+        TERM_SPREAD_KOR, TERM_SPREAD_US, CREDIT_SPREAD_KOR, LOG_USD2KRW, LOG_CHY2KRW, LOG_EURO2KRW,
+        TED_SPREAD, LOG_NYSE, LOG_NASDAQ, LOG_OIL
+    ]
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
