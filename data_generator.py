@@ -9,6 +9,8 @@ from ksif import Portfolio
 from ksif.core.columns import *
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from tqdm import tqdm
+import os
+from multiprocessing import Pool
 
 # DATA_SET
 ALL = 'all'
@@ -90,6 +92,7 @@ def save_all():
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
     portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(portfolio, ALL, rolling_columns)
 
@@ -102,6 +105,7 @@ def save_filter():
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
     portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
     # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
     portfolio = portfolio.loc[(portfolio[PER] < 10) & (portfolio[PER] > 2)]
     # 0.2 < PBR < 1.0
@@ -122,6 +126,7 @@ def save_bollinger():
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
     portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # Bollinger
     portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
@@ -143,6 +148,7 @@ def save_sector():
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
     portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # KRX_SECTOR가 존재하지 않는 데이터 제거
     portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
@@ -174,13 +180,80 @@ def save_macro():
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
     portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(portfolio, MACRO, rolling_columns)
 
 
+def save_concepts():
+    portfolio = Portfolio()
+    # 최소 시가총액 100억
+    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+    # 월 거래액 10억 이상
+    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+
+    value_factors = VALUE_FACTORS
+    profit_factors = PROFIT_FACTORS
+    growth_factors = GROWTH_FACTORS
+    momentum_factors = MOMENTUM_FACTORS
+    safety_factors = SAFETY_FACTORS
+    liquidity_factors = [
+        TRADING_VOLUME_RATIO, NET_PERSONAL_PURCHASE_RATIO, NET_INSTITUTIONAL_FOREIGN_PURCHASE_RATIO,
+        NET_INSTITUTIONAL_PURCHASE_RATIO, NET_FINANCIAL_INVESTMENT_PURCHASE_RATIO, NET_INSURANCE_PURCHASE_RATIO,
+        NET_TRUST_PURCHASE_RATIO, NET_PRIVATE_FUND_PURCHASE_RATIO, NET_BANK_PURCHASE_RATIO,
+        NET_ETC_FINANCE_PURCHASE_RATIO, NET_PENSION_PURCHASE_RATIO, NET_NATIONAL_PURCHASE_RATIO,
+        NET_ETC_CORPORATION_PURCHASE_RATIO, NET_FOREIGN_PURCHASE_RATIO, NET_REGISTERED_FOREIGN_PURCHASE_RATIO,
+        NET_ETC_FOREIGN_PURCHASE_RATIO, FOREIGN_OWNERSHIP_RATIO
+    ]
+
+    factor_groups = {}
+
+    for vf, vn in zip([value_factors, []], ['value_', '']):
+        for pf, pn in zip([profit_factors, []], ['profit_', '']):
+            for gf, gn in zip([growth_factors, []], ['growth_', '']):
+                for mf, mn in zip([momentum_factors, []], ['momentum_', '']):
+                    for sf, sn in zip([safety_factors, []], ['safety_', '']):
+                        for lf, ln in zip([liquidity_factors, []], ['liquidity_', '']):
+                            factor_group = []
+                            factor_group.extend(vf)
+                            factor_group.extend(pf)
+                            factor_group.extend(gf)
+                            factor_group.extend(mf)
+                            factor_group.extend(sf)
+                            factor_group.extend(lf)
+                            factor_names = []
+                            factor_names.extend(vn)
+                            factor_names.extend(pn)
+                            factor_names.extend(gn)
+                            factor_names.extend(mn)
+                            factor_names.extend(sn)
+                            factor_names.extend(ln)
+                            factor_name = ''.join(factor_names)
+                            if factor_name:
+                                factor_groups[factor_name[:-2]] = factor_group
+
+    factor_group_len = len(factor_groups)
+
+    with Pool(os.cpu_count()) as p:
+        # noinspection PyTypeChecker
+        rs = [p.apply_async(save_data, (pf, key, value)) for pf, (key, value) in zip(
+            [portfolio for _ in range(factor_group_len)],
+            factor_groups.items()
+        )]
+        for r in rs:
+            r.wait()
+        p.close()
+        p.join()
+
+
 if __name__ == '__main__':
-    save_all()
-    save_macro()
-    save_filter()
-    save_bollinger()
-    save_sector()
+    save_concepts()
+    with Pool(os.cpu_count()) as p:
+        results = [p.apply_async(func) for func in [
+            save_all, save_macro, save_filter, save_bollinger, save_sector
+        ]]
+        for result in results:
+            result.wait()
+        p.close()
+        p.join()
