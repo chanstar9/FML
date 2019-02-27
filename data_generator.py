@@ -197,15 +197,6 @@ def save_concepts():
     profit_factors = PROFIT_FACTORS
     growth_factors = GROWTH_FACTORS
     momentum_factors = MOMENTUM_FACTORS
-    safety_factors = SAFETY_FACTORS
-    liquidity_factors = [
-        TRADING_VOLUME_RATIO, NET_PERSONAL_PURCHASE_RATIO, NET_INSTITUTIONAL_FOREIGN_PURCHASE_RATIO,
-        NET_INSTITUTIONAL_PURCHASE_RATIO, NET_FINANCIAL_INVESTMENT_PURCHASE_RATIO, NET_INSURANCE_PURCHASE_RATIO,
-        NET_TRUST_PURCHASE_RATIO, NET_PRIVATE_FUND_PURCHASE_RATIO, NET_BANK_PURCHASE_RATIO,
-        NET_ETC_FINANCE_PURCHASE_RATIO, NET_PENSION_PURCHASE_RATIO, NET_NATIONAL_PURCHASE_RATIO,
-        NET_ETC_CORPORATION_PURCHASE_RATIO, NET_FOREIGN_PURCHASE_RATIO, NET_REGISTERED_FOREIGN_PURCHASE_RATIO,
-        NET_ETC_FOREIGN_PURCHASE_RATIO, FOREIGN_OWNERSHIP_RATIO
-    ]
 
     factor_groups = {}
 
@@ -213,25 +204,19 @@ def save_concepts():
         for pf, pn in zip([profit_factors, []], ['profit_', '']):
             for gf, gn in zip([growth_factors, []], ['growth_', '']):
                 for mf, mn in zip([momentum_factors, []], ['momentum_', '']):
-                    for sf, sn in zip([safety_factors, []], ['safety_', '']):
-                        for lf, ln in zip([liquidity_factors, []], ['liquidity_', '']):
-                            factor_group = []
-                            factor_group.extend(vf)
-                            factor_group.extend(pf)
-                            factor_group.extend(gf)
-                            factor_group.extend(mf)
-                            factor_group.extend(sf)
-                            factor_group.extend(lf)
-                            factor_names = []
-                            factor_names.extend(vn)
-                            factor_names.extend(pn)
-                            factor_names.extend(gn)
-                            factor_names.extend(mn)
-                            factor_names.extend(sn)
-                            factor_names.extend(ln)
-                            factor_name = ''.join(factor_names)
-                            if factor_name:
-                                factor_groups[factor_name[:-2]] = factor_group
+                    factor_group = []
+                    factor_group.extend(vf)
+                    factor_group.extend(pf)
+                    factor_group.extend(gf)
+                    factor_group.extend(mf)
+                    factor_names = []
+                    factor_names.extend(vn)
+                    factor_names.extend(pn)
+                    factor_names.extend(gn)
+                    factor_names.extend(mn)
+                    factor_name = ''.join(factor_names)
+                    if factor_name:
+                        factor_groups[factor_name[:-2]] = factor_group
 
     factor_group_len = len(factor_groups)
 
