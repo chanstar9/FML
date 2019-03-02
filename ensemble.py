@@ -215,10 +215,6 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     ensemble_cumulative_returns.fillna(method='ffill', inplace=True)
     ensemble_cumulative_returns.fillna(0, inplace=True)
 
-    # Summary
-    for ensemble_prediction in ensemble_predictions:
-        ensemble_prediction[DATE] = ensemble_prediction[DATE].astype(str)
-
     ensemble_portfolios = [Portfolio(ensemble_prediction) for ensemble_prediction in
                            ensemble_predictions[(step - 1)::step]]
     ensemble_outcomes = [ensemble_portfolio.outcome() for ensemble_portfolio in ensemble_portfolios]
@@ -226,6 +222,10 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     active_returns = [ensemble_outcome[ACTIVE_RETURN] for ensemble_outcome in ensemble_outcomes]
     active_risks = [ensemble_outcome[ACTIVE_RISK] for ensemble_outcome in ensemble_outcomes]
     information_ratios = [ensemble_outcome[IR] for ensemble_outcome in ensemble_outcomes]
+    sharpe_ratios = [ensemble_outcome[SR] for ensemble_outcome in ensemble_outcomes]
+    MDDs = [ensemble_outcome[MDD] for ensemble_outcome in ensemble_outcomes]
+    alphas = [ensemble_outcome[FAMA_FRENCH_ALPHA] for ensemble_outcome in ensemble_outcomes]
+    betas = [ensemble_outcome[FAMA_FRENCH_BETA] for ensemble_outcome in ensemble_outcomes]
     CAGRs = [ensemble_outcome[CAGR] for ensemble_outcome in ensemble_outcomes]
     rigid_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, quantile) for
                         ensemble_portfolio in ensemble_portfolios]
@@ -241,6 +241,10 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         ACTIVE_RETURN: active_returns,
         ACTIVE_RISK: active_risks,
         IR: information_ratios,
+        SR: sharpe_ratios,
+        MDD: MDDs,
+        FAMA_FRENCH_ALPHA: alphas,
+        FAMA_FRENCH_BETA: betas,
         CAGR: CAGRs,
         RIGID_ACCURACY: rigid_accuracies,
         DECILE_ACCURACY: decile_accuracies,
@@ -257,7 +261,6 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
 
         # Company number
         ensemble_numbers.plot(ax=axes[0], colormap='Blues')
-        # axes[0].set_ylim(0, 50)
         axes[0].set_title('{}:{}, Top {}-quantile'.format(method.title(), model_name, quantile))
         axes[0].set_xlabel('Date')
         axes[0].set_ylabel('# of companies')
@@ -265,7 +268,6 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
 
         # Cumulative return
         ensemble_cumulative_returns.plot(ax=axes[1], colormap='Blues')
-        # axes[1].set_ylim(-1, 16)
         axes[1].set_xlabel('Date')
         axes[1].set_ylabel('Return')
         axes[1].legend(loc='upper left')
@@ -285,13 +287,24 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     return ensemble_summary, ensemble_portfolios
 
 
+# noinspection PyPep8Naming
 def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9, step: int = 1, quantile: int = 40,
                      to_csv: bool = True, show_plot: bool = False):
     file_names = []
     CAGRs = []
-    rank_correlations = []
-    rank_p_values = []
+    GAGR_rank_correlations = []
+    CAGR_rank_p_values = []
     IRs = []
+    IR_rank_correlations = []
+    IR_rank_p_values = []
+    SRs = []
+    SR_rank_correlations = []
+    SR_rank_p_values = []
+    MDDs = []
+    alphas = []
+    alpha_rank_correlations = []
+    alpha_rank_p_values = []
+    betas = []
     rigid_accuracies = []
     decile_accuracies = []
     quarter_accuracies = []
@@ -352,15 +365,36 @@ def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9
                 = ensemble_portfolio_ratio[KOSDAQ_SMALL] / ensemble_portfolio_ratio[COUNT]
 
             file_names.append(_get_file_name(method, model, quantile))
+
             CAGRs.append(ensemble_summary[CAGR].values[-1])
-            rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
-            rank_correlations.append(rankIC[0])
-            rank_p_values.append(rankIC[1])
+            CAGR_rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
+            GAGR_rank_correlations.append(CAGR_rankIC[0])
+            CAGR_rank_p_values.append(CAGR_rankIC[1])
+
             IRs.append(ensemble_summary[IR].values[-1])
+            IR_rankIC = spearmanr(ensemble_summary[IR].values, ensemble_summary[IR].index)
+            IR_rank_correlations.append(IR_rankIC[0])
+            IR_rank_p_values.append(IR_rankIC[1])
+
+            SRs.append(ensemble_summary[SR].values[-1])
+            SR_rankIC = spearmanr(ensemble_summary[SR].values, ensemble_summary[SR].index)
+            SR_rank_correlations.append(SR_rankIC[0])
+            SR_rank_p_values.append(SR_rankIC[1])
+
+            MDDs.append(ensemble_summary[MDD].values[-1])
+
+            alphas.append(ensemble_summary[FAMA_FRENCH_ALPHA].values[-1])
+            alpha_rankIC = spearmanr(ensemble_summary[FAMA_FRENCH_ALPHA].values,
+                                     ensemble_summary[FAMA_FRENCH_ALPHA].index)
+            alpha_rank_correlations.append(alpha_rankIC[0])
+            alpha_rank_p_values.append(alpha_rankIC[1])
+            betas.append(ensemble_summary[FAMA_FRENCH_BETA].values[-1])
+
             rigid_accuracies.append(ensemble_summary[RIGID_ACCURACY].values[-1])
             decile_accuracies.append(ensemble_summary[DECILE_ACCURACY].values[-1])
             quarter_accuracies.append(ensemble_summary[QUARTER_ACCURACY].values[-1])
             half_accuracies.append(ensemble_summary[HALF_ACCURACY].values[-1])
+
             kospi_larges.append(ensemble_portfolio_ratio[KOSPI_LARGE].mean())
             kospi_middles.append(ensemble_portfolio_ratio[KOSPI_MIDDLE].mean())
             kospi_smalls.append(ensemble_portfolio_ratio[KOSPI_SMALL].mean())
@@ -371,9 +405,19 @@ def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9
     comparison_result = pd.DataFrame(data={
         'Model': file_names,
         'CAGR': CAGRs,
-        'Rank corr': rank_correlations,
-        'Rank p-value': rank_p_values,
+        'CAGR RC': GAGR_rank_correlations,
+        'CAGR RC p-value': CAGR_rank_p_values,
         'IR': IRs,
+        'IR RC': IR_rank_correlations,
+        'IR RC p-value': IR_rank_p_values,
+        'SR': SRs,
+        'SR RC': SR_rank_correlations,
+        'SR RC p-value': SR_rank_p_values,
+        'FF alpha': alphas,
+        'FF alpha RC': alpha_rank_correlations,
+        'FF alpha RC p-value': alpha_rank_p_values,
+        'FF betas': betas,
+        'MDD': MDDs,
         'Rigid accuracy': rigid_accuracies,
         'Decile accuracy': decile_accuracies,
         'Quarter accuracy': quarter_accuracies,
