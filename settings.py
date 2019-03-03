@@ -70,6 +70,7 @@ def get_data(data_name):
 
 data_sets = LazyDict({
     ALL: (get_data, ALL),
+    MACRO: (get_data, MACRO),
     FILTER: (get_data, FILTER),
     BOLLINGER: (get_data, BOLLINGER),
     SECTOR: (get_data, SECTOR),
