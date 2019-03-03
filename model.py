@@ -3,19 +3,20 @@
 :Author: Jaekyoung Kim
 :Date: 2018-09-23
 """
+import gc
 import os
 from datetime import datetime
+from multiprocessing import Pool
 from pathlib import Path
-import gc
 
 import keras
 import tensorflow as tf
+from arch import arch_model
 from dateutil.relativedelta import relativedelta
 from keras import backend as k
 from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
-from multiprocessing import Pool
 
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
@@ -160,8 +161,9 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True):
-
+def _backtest(case_number: int, param: dict, test_months: list,
+              x_test_scaling=True, y_test_scaling=True,
+              control_volatility_regime=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -173,7 +175,31 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
     file_name = get_file_name(param)
     desc = "#{0:2d}".format(case_number)
     df_predictions = pd.DataFrame()
+
+    #### Calculate past actual volatilities
+    pf = Portfolio()
+    bm = pf.get_benchmark(KOSPI)
+    returns = bm[BENCHMARK_RET_1]
+    returns = returns.dropna()
+    window = 10
+    actual_vol = returns.rolling(window).var()
+
     for month in tqdm(test_months, desc=desc):
+        if control_volatility_regime:
+            #### Predict a future volatility
+
+            ret_rolling = returns.loc[returns.index < month]
+            am = arch_model(ret_rolling, vol='Garch', p=1, o=0, q=1, dist='Normal')
+            res = am.fit(update_freq=0, disp='off')
+            vol = res.forecast(horizon=1).variance.dropna()
+            vol = vol.iloc[0, 0]
+            execution = vol < actual_vol.loc[returns.index < month].quantile(.85)
+            #### Determine whether invest or not
+            if not execution:
+                continue
+                # If determined investing, train a model and get predictions
+
+        # Or skip this month
         model, x_test, y_test = train_model(month, param)
 
         # MinMaxScaling x_test
@@ -184,7 +210,7 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
 
         # MinMaxScaling y_test
         if y_test_scaling:
-            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min())/(y_test[RET_1].max() - y_test[RET_1].min())
+            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min()) / (y_test[RET_1].max() - y_test[RET_1].min())
 
         df_prediction = get_predictions(model, x_test, y_test)
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)

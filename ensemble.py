@@ -28,8 +28,11 @@ DECILE_ACCURACY = 'decile_accuracy'
 QUARTER_ACCURACY = 'quarter_accuracy'
 HALF_ACCURACY = 'half_accuracy'
 
-actual_returns = Portfolio()[[DATE, CODE, RET_1]]
-actual_returns[DATE] = pd.to_datetime(actual_returns[DATE])
+pf = Portfolio()
+CD91_returns = pf.get_benchmark(CD91)[BENCHMARK_RET_1]
+CD91_returns = CD91_returns.dropna()
+
+actual_returns = pf[[DATE, CODE, RET_1]]
 
 
 def get_intersection_ensemble_predictions(predictions, quantile: int = 40):
@@ -119,6 +122,17 @@ GET_ENSEMBLE_PREDICTIONS = {
 
 
 def _cumulate(ret):
+    from model import TRAIN_START_DATE
+    """
+
+    :param ret: (Series)
+        key     DATE    | (datetime)
+        column  RET_1   | (float)
+
+    :return:
+    """
+    ret = pd.concat([ret, CD91_returns.loc[TRAIN_START_DATE:CD91_returns.index[-2]]], 1)
+    ret = ret.iloc[:, 0].fillna(value=ret.iloc[:, 1])
     ret.iloc[0] = 0
     ret = ret + 1
     ret = ret.cumprod()
@@ -394,46 +408,46 @@ def compare_ensemble(methods, models, start_number: int = 0, end_number: int = 9
 
 if __name__ == '__main__':
     models = [
-        'NN3_1-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_2-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_3-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_1-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_2-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_2-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_2-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_2-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_3-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_3-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_3-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_3-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_4-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_4-all-relu-he_uniform-glorot_uniform-none',
+        # 'NN3_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'NN3_2-all-linear-he_uniform-glorot_uniform-none',
+        # 'NN3_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'NN3_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_1-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_2-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_2-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_3-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN5_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN5_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN5_4-all-relu-he_uniform-glorot_uniform-none',
         'DNN5_4-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_1-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_1-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_2-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_2-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_2-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_3-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_3-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_3-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_3-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_4-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_4-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_1-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_1-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_2-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_2-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_2-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_3-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_3-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_3-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_3-all-relu-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_4-all-linear-he_uniform-glorot_uniform-none',
+        # 'DNN8_4-all-linear-he_uniform-glorot_uniform-none-0.5',
+        # 'DNN8_4-all-relu-he_uniform-glorot_uniform-none',
+        # 'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
     ]
     methods = [
         INTERSECTION,
-        GEOMETRIC
+        # GEOMETRIC
     ]
     compare_ensemble(methods, models, start_number=0, end_number=9, step=1, quantile=10, to_csv=True, show_plot=True)
