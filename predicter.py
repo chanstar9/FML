@@ -21,5 +21,5 @@ if __name__ == '__main__':
             HIDDEN_LAYER: DNN8_1,
             DROPOUT: False,
             DROPOUT_RATE: 0.5},
-        quantile=40, model_num=10, method=INTERSECTION
+        quantile=5, model_num=10, method=INTERSECTION
     )
