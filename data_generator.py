@@ -102,8 +102,8 @@ def save_all(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(only_old_data, portfolio, ALL, rolling_columns)
 
@@ -115,8 +115,8 @@ def save_filter(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
     # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
     portfolio = portfolio.loc[(portfolio[PER] < 10) & (portfolio[PER] > 2)]
     # 0.2 < PBR < 1.0
@@ -136,8 +136,8 @@ def save_bollinger(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # Bollinger
     portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
@@ -158,8 +158,8 @@ def save_sector(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # KRX_SECTOR가 존재하지 않는 데이터 제거
     portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
@@ -190,8 +190,8 @@ def save_macro(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(only_old_data, portfolio, MACRO, rolling_columns)
 
@@ -201,8 +201,8 @@ def save_concepts(only_old_data: bool):
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
     # 월 거래액 10억 이상
-    portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
+    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     value_factors = VALUE_FACTORS
     profit_factors = PROFIT_FACTORS
@@ -244,14 +244,14 @@ def save_concepts(only_old_data: bool):
 
 if __name__ == '__main__':
     only_old_data = False
-    # save_concepts(only_old_data=only_old_data)
+    save_concepts(only_old_data=only_old_data)
     with Pool(os.cpu_count() // 2) as p:
         results = [p.apply_async(func, [only_old_data]) for func in [
             save_all,
-            # save_macro,
-            # save_filter,
-            # save_bollinger,
-            # save_sector
+            save_macro,
+            save_filter,
+            save_bollinger,
+            save_sector
         ]]
         for result in results:
             result.wait()

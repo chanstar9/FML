@@ -184,16 +184,14 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=F
     desc = "#{0:2d}".format(case_number)
     df_predictions = pd.DataFrame()
 
-    # Calculate past actual volatilities
-    pf = Portfolio()
-    bm = pf.get_benchmark(KOSPI)
-    returns = bm[BENCHMARK_RET_1]
-    returns = returns.dropna()
-    window = 10
-    actual_vol = returns.rolling(window).var()
-
     for month in tqdm(test_months, desc=desc):
         if control_volatility_regime:
+            # Calculate past actual volatilities
+            bm = pf.get_benchmark(KOSPI)
+            returns = bm.loc[:, BENCHMARK_RET_1] * 100
+            returns = returns.dropna()
+            window = 10
+            actual_vol = returns.rolling(window).var()
             # Predict a future volatility
             ret_rolling = returns.loc[returns.index < month]
             am = arch_model(ret_rolling, vol='Garch', p=1, o=0, q=1, dist='Normal')

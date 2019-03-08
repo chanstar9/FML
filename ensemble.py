@@ -462,48 +462,17 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
 
 if __name__ == '__main__':
     models = [
-        'NN3_1-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_2-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_3-all-linear-he_uniform-glorot_uniform-none',
-        'NN3_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_1-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_1-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_2-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_2-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_2-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_2-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_3-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_3-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_3-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_3-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN5_4-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN5_4-all-relu-he_uniform-glorot_uniform-none',
-        'DNN5_4-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_1-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_1-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_1-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_1-all-relu-he_uniform-glorot_uniform-none-0.5',
         'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_2-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_2-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_2-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_3-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_3-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_3-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_3-all-relu-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_4-all-linear-he_uniform-glorot_uniform-none',
-        'DNN8_4-all-linear-he_uniform-glorot_uniform-none-0.5',
-        'DNN8_4-all-relu-he_uniform-glorot_uniform-none',
-        'DNN8_4-all-relu-he_uniform-glorot_uniform-none-0.5',
     ]
     methods = [
         INTERSECTION,
         GEOMETRIC
     ]
     quantiles = [
-        5, 10, 20, 40
+        2,
+        5,
+        10,
+        20,
+        40
     ]
     compare_ensemble(methods, models, quantiles, start_number=0, end_number=9, step=1, to_csv=True, show_plot=True)
