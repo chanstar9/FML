@@ -4,7 +4,7 @@
 :Date: 2018. 9. 28.
 """
 from keras.activations import linear, tanh, relu
-from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform
+from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform, zeros
 from keras.regularizers import l1, l2, l1_l2
 
 from data_generator import *
@@ -68,13 +68,30 @@ def get_data(data_name):
     return data
 
 
-data_sets = LazyDict({
+_data_sets = {
     ALL: (get_data, ALL),
     MACRO: (get_data, MACRO),
     FILTER: (get_data, FILTER),
     BOLLINGER: (get_data, BOLLINGER),
     SECTOR: (get_data, SECTOR),
-})
+}
+
+for value_name in ['value_', '']:
+    for size_name in ['size_', '']:
+        for momentum_name in ['momentum_', '']:
+            for quality_name in ['quality_', '']:
+                for volatility_name in ['volatility_', '']:
+                    factor_names = []
+                    factor_names.extend(value_name)
+                    factor_names.extend(size_name)
+                    factor_names.extend(momentum_name)
+                    factor_names.extend(quality_name)
+                    factor_names.extend(volatility_name)
+                    factor_name = ''.join(factor_names)
+                    if factor_name:
+                        _data_sets[factor_name[:-1]] = (get_data, factor_name[:-1])
+
+data_sets = LazyDict(_data_sets)
 
 activations = {
     LINEAR: linear,
@@ -88,7 +105,8 @@ initializers = {
     HE_NORMAL: he_normal(),
     HE_UNIFORM: he_uniform(),
     GLOROT_NORMAL: glorot_normal(),
-    GLOROT_UNIFORM: glorot_uniform()
+    GLOROT_UNIFORM: glorot_uniform(),
+    ZEROS: zeros()
 }
 
 regularizers = {

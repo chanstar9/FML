@@ -101,9 +101,6 @@ def save_all(only_old_data: bool):
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(only_old_data, portfolio, ALL, rolling_columns)
 
@@ -114,9 +111,7 @@ def save_filter(only_old_data: bool):
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+
     # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
     portfolio = portfolio.loc[(portfolio[PER] < 10) & (portfolio[PER] > 2)]
     # 0.2 < PBR < 1.0
@@ -135,9 +130,6 @@ def save_bollinger(only_old_data: bool):
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # Bollinger
     portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
@@ -157,9 +149,6 @@ def save_sector(only_old_data: bool):
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     # KRX_SECTOR가 존재하지 않는 데이터 제거
     portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
@@ -189,49 +178,47 @@ def save_macro(only_old_data: bool):
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
 
     save_data(only_old_data, portfolio, MACRO, rolling_columns)
 
 
 def save_concepts(only_old_data: bool):
+    log_mktcap = 'log_mktcap'
     portfolio = Portfolio()
-    # 최소 시가총액 100억
-    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-    # 월 거래액 10억 이상
-    # portfolio[TRADING_CAPITAL] = portfolio[TRADING_VOLUME_RATIO] * portfolio[MKTCAP]
-    # portfolio = portfolio.loc[portfolio[TRADING_CAPITAL] > 1000000000, :]
+    portfolio[log_mktcap] = np.log(portfolio[MKTCAP])
 
-    value_factors = VALUE_FACTORS
-    profit_factors = PROFIT_FACTORS
-    growth_factors = GROWTH_FACTORS
-    momentum_factors = MOMENTUM_FACTORS
+    value_factors = [E_P, B_P, S_P, C_P, DIVP]
+    size_factors = [log_mktcap]
+    momentum_factors = [MOM1, MOM12]
+    quality_factors = [ROA, ROE, ROIC, S_A, DEBT_RATIO, EQUITY_RATIO, LIQ_RATIO]
+    volatility_factors = [VOL_1D]
 
     factor_groups = {}
 
-    for vf, vn in zip([value_factors, []], ['value_', '']):
-        for pf, pn in zip([profit_factors, []], ['profit_', '']):
-            for gf, gn in zip([growth_factors, []], ['growth_', '']):
-                for mf, mn in zip([momentum_factors, []], ['momentum_', '']):
-                    factor_group = []
-                    factor_group.extend(vf)
-                    factor_group.extend(pf)
-                    factor_group.extend(gf)
-                    factor_group.extend(mf)
-                    factor_names = []
-                    factor_names.extend(vn)
-                    factor_names.extend(pn)
-                    factor_names.extend(gn)
-                    factor_names.extend(mn)
-                    factor_name = ''.join(factor_names)
-                    if factor_name:
-                        factor_groups[factor_name[:-1]] = factor_group
+    for value_factor, value_name in zip([value_factors, []], ['value_', '']):
+        for size_factor, size_name in zip([size_factors, []], ['size_', '']):
+            for momentum_factor, momentum_name in zip([momentum_factors, []], ['momentum_', '']):
+                for quality_factor, quality_name in zip([quality_factors, []], ['quality_', '']):
+                    for volatility_factor, volatility_name in zip([volatility_factors, []], ['volatility_', '']):
+                        factor_group = []
+                        factor_group.extend(value_factor)
+                        factor_group.extend(size_factor)
+                        factor_group.extend(momentum_factor)
+                        factor_group.extend(quality_factor)
+                        factor_group.extend(volatility_factor)
+                        factor_names = []
+                        factor_names.extend(value_name)
+                        factor_names.extend(size_name)
+                        factor_names.extend(momentum_name)
+                        factor_names.extend(quality_name)
+                        factor_names.extend(volatility_name)
+                        factor_name = ''.join(factor_names)
+                        if factor_name:
+                            factor_groups[factor_name[:-1]] = factor_group
 
     factor_group_len = len(factor_groups)
 
-    with Pool(os.cpu_count() // 2) as p:
+    with Pool(os.cpu_count()) as p:
         rs = [p.apply_async(save_data, [only_old_data, pf, key, value]) for pf, (key, value) in zip(
             [portfolio for _ in range(factor_group_len)],
             factor_groups.items()
@@ -243,9 +230,9 @@ def save_concepts(only_old_data: bool):
 
 
 if __name__ == '__main__':
-    only_old_data = False
+    only_old_data = True
     save_concepts(only_old_data=only_old_data)
-    with Pool(os.cpu_count() // 2) as p:
+    with Pool(os.cpu_count()) as p:
         results = [p.apply_async(func, [only_old_data]) for func in [
             save_all,
             save_macro,
