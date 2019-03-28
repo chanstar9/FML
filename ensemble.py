@@ -3,97 +3,19 @@
 :Author: Jaekyoung Kim
 :Date: 2018. 11. 25.
 """
+import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from ksif import Portfolio
-from ksif.core.columns import *
-from ksif.core.outcomes import *
 from scipy.stats import spearmanr
 from tqdm import tqdm
 
-INTERSECTION = 'intersection'
-GEOMETRIC = 'geometric'
+from ensemble_method import *
 
 QUANTILE = 'quantile'
-PREDICTED_RET_1 = 'predict_return_1'
-ACTUAL_RANK = 'actual_rank'
-PREDICTED_RANK = 'predicted_rank'
 COUNT = 'count'
 
-RANK = 'rank'
 CORRECT = 'correct'
-RIGID_ACCURACY = 'rigid_accuracy'
-DECILE_ACCURACY = 'decile_accuracy'
-QUARTER_ACCURACY = 'quarter_accuracy'
-HALF_ACCURACY = 'half_accuracy'
-
-pf = Portfolio()
-CD91_returns = pf.get_benchmark(CD91)[BENCHMARK_RET_1]
-CD91_returns = CD91_returns.dropna()
-
-actual_returns = pf[[DATE, CODE, RET_1]]
-
-
-def get_intersection_ensemble_predictions(predictions, quantile: int = 40):
-    """
-    :return ensemble_predictions:
-        DATE        | (datetime64)
-        CODE        | (str)
-    """
-    selected_predictions = _select_predictions(predictions, quantile, [DATE, CODE])
-
-    # Intersection
-    ensemble_predictions = [selected_predictions[0]]
-    for current_prediction in selected_predictions[1:]:
-        previous_ensemble = ensemble_predictions[-1]
-        current_ensemble = pd.merge(previous_ensemble, current_prediction, on=[DATE, CODE])
-        ensemble_predictions.append(current_ensemble)
-    for index, ensemble_prediction in enumerate(ensemble_predictions):
-        ensemble_predictions[index] = pd.merge(
-            ensemble_prediction, predictions[0].loc[:, [DATE, CODE]], on=[DATE, CODE]
-        )
-    return ensemble_predictions
-
-
-def get_geometric_ensemble_predictions(predictions, quantile: int = 40):
-    """
-    :return ensemble_predictions:
-        DATE        | (datetime64)
-        CODE        | (str)
-    """
-    # Take exponential
-    for prediction in predictions:
-        prediction[PREDICTED_RET_1] = np.exp(prediction[PREDICTED_RET_1])
-
-    # Geometric mean
-    ensemble_predictions = [predictions[0]]
-    for current_prediction in predictions[1:]:
-        previous_ensemble = ensemble_predictions[-1]
-        current_ensemble = current_prediction
-        current_ensemble[PREDICTED_RET_1] = previous_ensemble[PREDICTED_RET_1] * current_prediction[PREDICTED_RET_1]
-        ensemble_predictions.append(current_ensemble)
-    for index, ensemble_prediction in enumerate(ensemble_predictions):
-        ensemble_prediction[PREDICTED_RET_1] = ensemble_prediction[PREDICTED_RET_1] ** (1 / (index + 1))
-
-    # Take log
-    for ensemble_prediction in ensemble_predictions:
-        ensemble_prediction[PREDICTED_RET_1] = np.log(ensemble_prediction[PREDICTED_RET_1])
-
-    # Select the top quantile
-    ensemble_predictions = _select_predictions(ensemble_predictions, quantile, [DATE, CODE])
-
-    return ensemble_predictions
-
-
-def _select_predictions(predictions, quantile, columns):
-    selected_predictions = []
-    for prediction in predictions:
-        prediction.loc[:, RANK] = prediction.groupby(by=[DATE])[PREDICTED_RET_1].transform(
-            lambda x: x.rank(ascending=False, pct=True)
-        )
-        selected_predictions.append(prediction.loc[prediction[RANK] <= (1 / quantile), columns])
-    return selected_predictions
 
 
 def _get_predictions(model_name, start_number, end_number):
@@ -101,43 +23,10 @@ def _get_predictions(model_name, start_number, end_number):
         '{}-{}.csv'.format(x, model_name) for x in range(start_number, end_number + 1)
     ]
     predictions = [
-        pd.read_csv('prediction/{}/{}'.format(model_name, file_name), parse_dates=[DATE]) for file_name in file_names
+        pd.read_csv('prediction/{}/{}'.format(model_name, file_name), parse_dates=[DATE])[[DATE, CODE, PREDICTED_RET_1]]
+        for file_name in file_names
     ]
-    for prediction in predictions:
-        prediction[ACTUAL_RANK] = prediction[[DATE, RET_1]].groupby(DATE).rank(ascending=False).reset_index(drop=True)
-        prediction[PREDICTED_RANK] = prediction[[DATE, PREDICTED_RET_1]].groupby(DATE).rank(
-            ascending=False).reset_index(drop=True)
     return predictions
-
-
-METHODS = [
-    INTERSECTION,
-    GEOMETRIC
-]
-
-GET_ENSEMBLE_PREDICTIONS = {
-    INTERSECTION: get_intersection_ensemble_predictions,
-    GEOMETRIC: get_geometric_ensemble_predictions
-}
-
-
-def _cumulate(ret):
-    from model import TRAIN_START_DATE
-    """
-
-    :param ret: (Series)
-        key     DATE    | (datetime)
-        column  RET_1   | (float)
-
-    :return:
-    """
-    ret = pd.concat([ret, CD91_returns.loc[TRAIN_START_DATE:CD91_returns.index[-2]]], 1)
-    ret = ret.iloc[:, 0].fillna(value=ret.iloc[:, 1])
-    ret.iloc[0] = 0
-    ret = ret + 1
-    ret = ret.cumprod()
-    ret = ret - 1
-    return ret
 
 
 def _get_file_name(method: str, model_name: str, quantile: int) -> str:
@@ -145,38 +34,19 @@ def _get_file_name(method: str, model_name: str, quantile: int) -> str:
     return result_file_name
 
 
-def _calculate_accuracy(ensemble_portfolio, predictions, quantile):
-    ensemble_portfolio[DATE] = pd.to_datetime(ensemble_portfolio[DATE])
-
-    selected_predictions = _select_predictions(predictions[:1], quantile, [DATE, CODE])
-    selected_prediction_count = selected_predictions[0].groupby(by=DATE).count()
-    selected_prediction_count.rename(columns={CODE: COUNT}, inplace=True)
-    selected_prediction_count.reset_index(drop=False, inplace=True)
-
-    ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(by=DATE).count()
-    ensemble_portfolio_count.rename(columns={CODE: COUNT}, inplace=True)
-
-    merged_portfolio = pd.merge(ensemble_portfolio, predictions[0][[DATE, CODE, ACTUAL_RANK]], on=[DATE, CODE])
-    merged_portfolio = pd.merge(merged_portfolio, selected_prediction_count, on=DATE)
-    merged_portfolio[CORRECT] = merged_portfolio[ACTUAL_RANK] <= merged_portfolio[COUNT]
-
-    accuracies = merged_portfolio[[DATE, CORRECT]].groupby(DATE).sum()[CORRECT] / \
-                 ensemble_portfolio_count[COUNT]
-    accuracy = accuracies.mean()
-
-    return accuracy
-
-
-def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number: int = 9, step: int = 1,
-                 quantile: int = 40, show_plot=True):
+def get_ensemble(method: str, adaptive_outcome: str, model_name: str, start_number: int, end_number: int, step: int,
+                 long_only: bool, quantile: int, decay: float, show_plot):
     """
 
     :param method: (str)
+    :param adaptive_outcome: (str)
     :param model_name: (str)
     :param start_number: (int)
     :param end_number: (int)
     :param step: (int)
+    :param long_only: (bool)
     :param quantile: (int)
+    :param decay: (float)
     :param show_plot: (bool)
 
     :return ensemble_summary: (DataFrame)
@@ -185,10 +55,6 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         ACTIVE_RISK         | (float)
         IR                  | (float)
         CAGR                | (float)
-        RIGID_ACCURACY      | (float)
-        DECILE_ACCURACY     | (float)
-        QUARTER_ACCURACY    | (float)
-        HALF_ACCURACY       | (float)
     :return ensemble_portfolios: ([Portfolio])
         DATE                | (datetime)
         CODE                | (str)
@@ -196,7 +62,8 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     """
     # Check parameters
     assert method in METHODS, "method does not exist."
-    assert end_number > start_number + 1, "end_number should be bigger than (start_number + 1)."
+    assert adaptive_outcome in ADAPTIVE_OUTCOMES, "outcome does not exist."
+    assert end_number > start_number, "end_number should be bigger than (start_number + 1)."
     assert step >= 1, "step should be a positive integer."
     assert quantile > 1, "quantile should be an integer bigger than 1."
 
@@ -206,28 +73,14 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
 
     get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
 
-    ensemble_predictions = get_ensemble_predictions(predictions, quantile)
+    ensemble_predictions = get_ensemble_predictions(predictions, quantile, long_only, adaptive_outcome, decay)
+    if long_only:
+        ensemble_predictions = [ensemble_prediction.loc[ensemble_prediction[WEIGHT] > 0, :] for
+                                ensemble_prediction in ensemble_predictions]
 
     # Append actual returns
-    ensemble_predictions = [pd.merge(ensemble_prediction, actual_returns, on=[DATE, CODE]) for
+    ensemble_predictions = [pd.merge(ensemble_prediction, actual_long_returns, on=[DATE, CODE]) for
                             ensemble_prediction in ensemble_predictions]
-
-    # Cumulative ensemble
-    ensemble_numbers = pd.DataFrame(index=ensemble_predictions[0][DATE].unique())
-    ensemble_cumulative_returns = pd.DataFrame(index=ensemble_predictions[0][DATE].unique())
-    for index, ensemble_prediction in enumerate(ensemble_predictions):
-        ensemble_number = ensemble_prediction.groupby(by=[DATE])[CODE].count()
-        ensemble_return = ensemble_prediction.groupby(by=[DATE])[RET_1].mean()
-        ensemble_cumulative_return = _cumulate(ensemble_return)
-
-        if (index + 1) % step == 0:
-            ensemble_numbers[index + 1] = ensemble_number
-            ensemble_cumulative_returns[index + 1] = ensemble_cumulative_return
-
-    # Fill nan
-    ensemble_numbers.fillna(0, inplace=True)
-    ensemble_cumulative_returns.fillna(method='ffill', inplace=True)
-    ensemble_cumulative_returns.fillna(0, inplace=True)
 
     ensemble_portfolios = [Portfolio(ensemble_prediction) for ensemble_prediction in
                            ensemble_predictions[(step - 1)::step]]
@@ -236,7 +89,8 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         if ensemble_portfolio.empty:
             return None, None
 
-    ensemble_outcomes = [ensemble_portfolio.outcome() for ensemble_portfolio in ensemble_portfolios]
+    ensemble_outcomes = [ensemble_portfolio.outcome(weighted=WEIGHT)
+                         for ensemble_portfolio in ensemble_portfolios]
     portfolio_returns = [ensemble_outcome[PORTFOLIO_RETURN] for ensemble_outcome in ensemble_outcomes]
     active_returns = [ensemble_outcome[ACTIVE_RETURN] for ensemble_outcome in ensemble_outcomes]
     active_risks = [ensemble_outcome[ACTIVE_RISK] for ensemble_outcome in ensemble_outcomes]
@@ -244,16 +98,9 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
     sharpe_ratios = [ensemble_outcome[SR] for ensemble_outcome in ensemble_outcomes]
     MDDs = [ensemble_outcome[MDD] for ensemble_outcome in ensemble_outcomes]
     alphas = [ensemble_outcome[FAMA_FRENCH_ALPHA] for ensemble_outcome in ensemble_outcomes]
+    alpha_p_values = [ensemble_outcome[FAMA_FRENCH_ALPHA_P_VALUE] for ensemble_outcome in ensemble_outcomes]
     betas = [ensemble_outcome[FAMA_FRENCH_BETA] for ensemble_outcome in ensemble_outcomes]
     CAGRs = [ensemble_outcome[CAGR] for ensemble_outcome in ensemble_outcomes]
-    rigid_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, quantile) for
-                        ensemble_portfolio in ensemble_portfolios]
-    decile_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 10) for
-                         ensemble_portfolio in ensemble_portfolios]
-    quarter_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 4) for
-                          ensemble_portfolio in ensemble_portfolios]
-    half_accuracies = [_calculate_accuracy(ensemble_portfolio, predictions, 2) for
-                       ensemble_portfolio in ensemble_portfolios]
 
     ensemble_summary = pd.DataFrame({
         PORTFOLIO_RETURN: portfolio_returns,
@@ -263,23 +110,49 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         SR: sharpe_ratios,
         MDD: MDDs,
         FAMA_FRENCH_ALPHA: alphas,
+        FAMA_FRENCH_ALPHA_P_VALUE: alpha_p_values,
         FAMA_FRENCH_BETA: betas,
         CAGR: CAGRs,
-        RIGID_ACCURACY: rigid_accuracies,
-        DECILE_ACCURACY: decile_accuracies,
-        QUARTER_ACCURACY: quarter_accuracies,
-        HALF_ACCURACY: half_accuracies,
-    }, index=ensemble_numbers.columns)
+    }, index=range(step - 1, end_number - start_number + 1, step))
+
+    if not Path('summary/' + method).exists():
+        os.makedirs('summary/' + method)
+
     ensemble_summary.to_csv('summary/' + result_file_name + '.csv')
     for ensemble_prediction in ensemble_predictions:
         ensemble_prediction[DATE] = pd.to_datetime(ensemble_prediction[DATE], format='%Y-%m-%d')
 
     # Plot
     if show_plot:
+        # Cumulative ensemble
+        ensemble_long_numbers = pd.DataFrame(index=ensemble_predictions[0][DATE].unique())
+        ensemble_short_numbers = pd.DataFrame(index=ensemble_predictions[0][DATE].unique())
+        ensemble_cumulative_returns = pd.DataFrame(index=ensemble_predictions[0][DATE].unique())
+        for index, ensemble_portfolio in enumerate(ensemble_portfolios):
+            long_portfolio = ensemble_portfolio.loc[ensemble_portfolio[WEIGHT] > 0, :]
+            short_portfolio = ensemble_portfolio.loc[ensemble_portfolio[WEIGHT] < 0, :]
+            short_portfolio.loc[:, RET_1] = -1 * short_portfolio.loc[:, RET_1]
+            short_portfolio.loc[:, WEIGHT] = -short_portfolio.loc[:, WEIGHT]
+            ensemble_long_number = long_portfolio.groupby(by=[DATE])[CODE].count()
+            ensemble_short_number = short_portfolio.groupby(by=[DATE])[CODE].count()
+
+            ensemble_long_numbers[index * step] = ensemble_long_number
+            ensemble_short_numbers[index * step] = ensemble_short_number
+            ensemble_cumulative_returns[index * step] = ensemble_portfolio.get_returns(weighted=WEIGHT, cumulative=True)
+
+        # Fill nan
+        ensemble_long_numbers.fillna(0, inplace=True)
+        ensemble_short_numbers.fillna(0, inplace=True)
+        ensemble_cumulative_returns.fillna(method='ffill', inplace=True)
+        ensemble_cumulative_returns.fillna(0, inplace=True)
+
+        print(ensemble_portfolios[-1].outcome(weighted=WEIGHT, show_plot=True))
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(8, 8))
 
         # Company number
-        ensemble_numbers.plot(ax=axes[0], colormap='Blues')
+        ensemble_long_numbers.plot(ax=axes[0], colormap='Blues')
+        if not long_only:
+            ensemble_short_numbers.plot(ax=axes[0], colormap='Oranges')
         axes[0].set_title('{}:{}, Top {}-quantile'.format(method.title(), model_name, quantile))
         axes[0].set_xlabel('Date')
         axes[0].set_ylabel('# of companies')
@@ -291,15 +164,6 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
         axes[1].set_ylabel('Return')
         axes[1].legend(loc='upper left')
 
-        # Information ratio
-        # ensembles = ensemble_cumulative_returns.columns
-        # trend_model = np.polyfit(ensembles, information_ratios, 1)
-        # get_trend = np.poly1d(trend_model)
-        # axes[2].plot(ensembles, information_ratios, 'black', ensembles, get_trend(ensembles), 'r--')
-        # axes[2].set_ylim(0.3, 0.5)
-        # axes[2].set_xlabel('# of ensembles')
-        # axes[2].set_ylabel('Information ratio')
-
         plt.savefig('summary/' + result_file_name + '.png')
         fig.show()
 
@@ -307,8 +171,8 @@ def get_ensemble(method: str, model_name: str, start_number: int = 0, end_number
 
 
 # noinspection PyPep8Naming
-def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_number: int = 9, step: int = 1,
-                     to_csv: bool = True, show_plot: bool = False):
+def compare_ensemble(methods, models, quantiles, adaptive_outcomes, start_number: int, end_number: int, step: int,
+                     long_only: bool, decay: float, to_csv: bool, show_plot: bool):
     file_names = []
     CAGRs = []
     GAGR_rank_correlations = []
@@ -321,13 +185,10 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
     SR_rank_p_values = []
     MDDs = []
     alphas = []
+    alpha_p_values = []
     alpha_rank_correlations = []
     alpha_rank_p_values = []
     betas = []
-    rigid_accuracies = []
-    decile_accuracies = []
-    quarter_accuracies = []
-    half_accuracies = []
     kospi_larges = []
     kospi_middles = []
     kospi_smalls = []
@@ -335,8 +196,9 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
     kosdaq_middles = []
     kosdaq_smalls = []
 
-    firms = Portfolio(include_holding=True, include_finance=True, include_managed=True, include_suspended=True).loc[:,
-            [DATE, CODE, MKTCAP, EXCHANGE]]
+    firms = Portfolio(
+        include_holding=True, include_finance=True, include_managed=True, include_suspended=True
+    ).loc[:, [DATE, CODE, MKTCAP, EXCHANGE]]
     firms[DATE] = pd.to_datetime(firms[DATE])
 
     firms[RANK] = firms[[DATE, EXCHANGE, MKTCAP]].groupby([DATE, EXCHANGE]).rank(ascending=False)
@@ -356,75 +218,85 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
     firms = firms.loc[
             :, [DATE, CODE, KOSPI_LARGE, KOSPI_MIDDLE, KOSPI_SMALL, KOSDAQ_LARGE, KOSDAQ_MIDDLE, KOSDAQ_SMALL]
             ]
+    with tqdm(total=len(methods) * len(quantiles) * len(models) * len(adaptive_outcomes)) as pbar:
+        for method in methods:
+            for quantile in quantiles:
+                for model in models:
+                    for adaptive_outcome in adaptive_outcomes:
+                        ensemble_summary, ensemble_portfolios = get_ensemble(
+                            method, adaptive_outcome, model, start_number=start_number, end_number=end_number,
+                            step=step,
+                            long_only=long_only, quantile=quantile, decay=decay, show_plot=show_plot
+                        )
 
-    for method in methods:
-        for quantile in quantiles:
-            for model in tqdm(models):
-                ensemble_summary, ensemble_portfolios = get_ensemble(
-                    method, model_name=model, start_number=start_number, end_number=end_number, step=step,
-                    quantile=quantile, show_plot=show_plot
-                )
+                        if ensemble_summary is None and ensemble_portfolios is None:
+                            continue
 
-                if ensemble_summary is None and ensemble_portfolios is None:
-                    continue
+                        file_names.append(_get_file_name(method, model, quantile))
 
-                ensemble_portfolio = pd.merge(ensemble_portfolios[-1], firms, on=[DATE, CODE])
-                ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(DATE).count()
-                ensemble_portfolio_count.rename(columns={CODE: COUNT}, inplace=True)
-                ensemble_portfolio_sum = ensemble_portfolio[[
-                    DATE, KOSPI_LARGE, KOSPI_MIDDLE, KOSPI_SMALL, KOSDAQ_LARGE, KOSDAQ_MIDDLE, KOSDAQ_SMALL
-                ]].groupby(DATE).sum()
-                ensemble_portfolio_ratio = pd.merge(ensemble_portfolio_sum, ensemble_portfolio_count, on=DATE)
-                ensemble_portfolio_ratio[KOSPI_LARGE] \
-                    = ensemble_portfolio_ratio[KOSPI_LARGE] / ensemble_portfolio_ratio[COUNT]
-                ensemble_portfolio_ratio[KOSPI_MIDDLE] \
-                    = ensemble_portfolio_ratio[KOSPI_MIDDLE] / ensemble_portfolio_ratio[COUNT]
-                ensemble_portfolio_ratio[KOSPI_SMALL] \
-                    = ensemble_portfolio_ratio[KOSPI_SMALL] / ensemble_portfolio_ratio[COUNT]
-                ensemble_portfolio_ratio[KOSDAQ_LARGE] \
-                    = ensemble_portfolio_ratio[KOSDAQ_LARGE] / ensemble_portfolio_ratio[COUNT]
-                ensemble_portfolio_ratio[KOSDAQ_MIDDLE] \
-                    = ensemble_portfolio_ratio[KOSDAQ_MIDDLE] / ensemble_portfolio_ratio[COUNT]
-                ensemble_portfolio_ratio[KOSDAQ_SMALL] \
-                    = ensemble_portfolio_ratio[KOSDAQ_SMALL] / ensemble_portfolio_ratio[COUNT]
+                        CAGRs.append(ensemble_summary[CAGR].values[-1])
+                        CAGR_rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
+                        GAGR_rank_correlations.append(CAGR_rankIC[0])
+                        CAGR_rank_p_values.append(CAGR_rankIC[1])
 
-                file_names.append(_get_file_name(method, model, quantile))
+                        IRs.append(ensemble_summary[IR].values[-1])
+                        IR_rankIC = spearmanr(ensemble_summary[IR].values, ensemble_summary[IR].index)
+                        IR_rank_correlations.append(IR_rankIC[0])
+                        IR_rank_p_values.append(IR_rankIC[1])
 
-                CAGRs.append(ensemble_summary[CAGR].values[-1])
-                CAGR_rankIC = spearmanr(ensemble_summary[CAGR].values, ensemble_summary[CAGR].index)
-                GAGR_rank_correlations.append(CAGR_rankIC[0])
-                CAGR_rank_p_values.append(CAGR_rankIC[1])
+                        SRs.append(ensemble_summary[SR].values[-1])
+                        SR_rankIC = spearmanr(ensemble_summary[SR].values, ensemble_summary[SR].index)
+                        SR_rank_correlations.append(SR_rankIC[0])
+                        SR_rank_p_values.append(SR_rankIC[1])
 
-                IRs.append(ensemble_summary[IR].values[-1])
-                IR_rankIC = spearmanr(ensemble_summary[IR].values, ensemble_summary[IR].index)
-                IR_rank_correlations.append(IR_rankIC[0])
-                IR_rank_p_values.append(IR_rankIC[1])
+                        MDDs.append(ensemble_summary[MDD].values[-1])
 
-                SRs.append(ensemble_summary[SR].values[-1])
-                SR_rankIC = spearmanr(ensemble_summary[SR].values, ensemble_summary[SR].index)
-                SR_rank_correlations.append(SR_rankIC[0])
-                SR_rank_p_values.append(SR_rankIC[1])
+                        alphas.append(ensemble_summary[FAMA_FRENCH_ALPHA].values[-1])
+                        alpha_p_values.append(ensemble_summary[FAMA_FRENCH_ALPHA_P_VALUE].values[-1])
+                        alpha_rankIC = spearmanr(ensemble_summary[FAMA_FRENCH_ALPHA].values,
+                                                 ensemble_summary[FAMA_FRENCH_ALPHA].index)
+                        alpha_rank_correlations.append(alpha_rankIC[0])
+                        alpha_rank_p_values.append(alpha_rankIC[1])
+                        betas.append(ensemble_summary[FAMA_FRENCH_BETA].values[-1])
 
-                MDDs.append(ensemble_summary[MDD].values[-1])
+                        if long_only:
+                            # Calculate a composition of the ensemble portfolio
+                            # when the portfolio is a long-only portfolio.
+                            ensemble_portfolio = pd.merge(ensemble_portfolios[-1], firms, on=[DATE, CODE])
+                            ensemble_portfolio_count = ensemble_portfolio[[DATE, CODE]].groupby(DATE).count()
+                            ensemble_portfolio_count.rename(columns={CODE: COUNT}, inplace=True)
+                            ensemble_portfolio_sum = ensemble_portfolio[[
+                                DATE, KOSPI_LARGE, KOSPI_MIDDLE, KOSPI_SMALL, KOSDAQ_LARGE, KOSDAQ_MIDDLE, KOSDAQ_SMALL
+                            ]].groupby(DATE).sum()
+                            ensemble_portfolio_ratio = pd.merge(ensemble_portfolio_sum, ensemble_portfolio_count,
+                                                                on=DATE)
+                            ensemble_portfolio_ratio[KOSPI_LARGE] \
+                                = ensemble_portfolio_ratio[KOSPI_LARGE] / ensemble_portfolio_ratio[COUNT]
+                            ensemble_portfolio_ratio[KOSPI_MIDDLE] \
+                                = ensemble_portfolio_ratio[KOSPI_MIDDLE] / ensemble_portfolio_ratio[COUNT]
+                            ensemble_portfolio_ratio[KOSPI_SMALL] \
+                                = ensemble_portfolio_ratio[KOSPI_SMALL] / ensemble_portfolio_ratio[COUNT]
+                            ensemble_portfolio_ratio[KOSDAQ_LARGE] \
+                                = ensemble_portfolio_ratio[KOSDAQ_LARGE] / ensemble_portfolio_ratio[COUNT]
+                            ensemble_portfolio_ratio[KOSDAQ_MIDDLE] \
+                                = ensemble_portfolio_ratio[KOSDAQ_MIDDLE] / ensemble_portfolio_ratio[COUNT]
+                            ensemble_portfolio_ratio[KOSDAQ_SMALL] \
+                                = ensemble_portfolio_ratio[KOSDAQ_SMALL] / ensemble_portfolio_ratio[COUNT]
+                            kospi_larges.append(ensemble_portfolio_ratio[KOSPI_LARGE].mean())
+                            kospi_middles.append(ensemble_portfolio_ratio[KOSPI_MIDDLE].mean())
+                            kospi_smalls.append(ensemble_portfolio_ratio[KOSPI_SMALL].mean())
+                            kosdaq_larges.append(ensemble_portfolio_ratio[KOSDAQ_LARGE].mean())
+                            kosdaq_middles.append(ensemble_portfolio_ratio[KOSDAQ_MIDDLE].mean())
+                            kosdaq_smalls.append(ensemble_portfolio_ratio[KOSDAQ_SMALL].mean())
+                        else:
+                            kospi_larges.append(0.0)
+                            kospi_middles.append(0.0)
+                            kospi_smalls.append(0.0)
+                            kosdaq_larges.append(0.0)
+                            kosdaq_middles.append(0.0)
+                            kosdaq_smalls.append(0.0)
 
-                alphas.append(ensemble_summary[FAMA_FRENCH_ALPHA].values[-1])
-                alpha_rankIC = spearmanr(ensemble_summary[FAMA_FRENCH_ALPHA].values,
-                                         ensemble_summary[FAMA_FRENCH_ALPHA].index)
-                alpha_rank_correlations.append(alpha_rankIC[0])
-                alpha_rank_p_values.append(alpha_rankIC[1])
-                betas.append(ensemble_summary[FAMA_FRENCH_BETA].values[-1])
-
-                rigid_accuracies.append(ensemble_summary[RIGID_ACCURACY].values[-1])
-                decile_accuracies.append(ensemble_summary[DECILE_ACCURACY].values[-1])
-                quarter_accuracies.append(ensemble_summary[QUARTER_ACCURACY].values[-1])
-                half_accuracies.append(ensemble_summary[HALF_ACCURACY].values[-1])
-
-                kospi_larges.append(ensemble_portfolio_ratio[KOSPI_LARGE].mean())
-                kospi_middles.append(ensemble_portfolio_ratio[KOSPI_MIDDLE].mean())
-                kospi_smalls.append(ensemble_portfolio_ratio[KOSPI_SMALL].mean())
-                kosdaq_larges.append(ensemble_portfolio_ratio[KOSDAQ_LARGE].mean())
-                kosdaq_middles.append(ensemble_portfolio_ratio[KOSDAQ_MIDDLE].mean())
-                kosdaq_smalls.append(ensemble_portfolio_ratio[KOSDAQ_SMALL].mean())
+                        pbar.update()
 
     comparison_result = pd.DataFrame(data={
         'Model': file_names,
@@ -438,14 +310,11 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
         'SR RC': SR_rank_correlations,
         'SR RC p-value': SR_rank_p_values,
         'FF alpha': alphas,
+        'FF alpha p-value': alpha_p_values,
         'FF alpha RC': alpha_rank_correlations,
         'FF alpha RC p-value': alpha_rank_p_values,
         'FF betas': betas,
         'MDD': MDDs,
-        'Rigid accuracy': rigid_accuracies,
-        'Decile accuracy': decile_accuracies,
-        'Quarter accuracy': quarter_accuracies,
-        'Half accuracy': half_accuracies,
         'KOSPI Large': kospi_larges,
         'KOSPI Middle': kospi_middles,
         'KOSPI Small': kospi_smalls,
@@ -462,17 +331,20 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
 
 if __name__ == '__main__':
     models = [
-        'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_1-size_momentum-tahn-zeros-lecun_normal-none-0.5',
     ]
     methods = [
-        INTERSECTION,
-        GEOMETRIC
+        BLEND,
+        ARITHMETIC,
     ]
     quantiles = [
-        2,
-        5,
-        10,
-        20,
-        40
+        3
     ]
-    compare_ensemble(methods, models, quantiles, start_number=0, end_number=9, step=1, to_csv=True, show_plot=True)
+    adaptive_outcomes = [
+        NONE,
+        # SR,
+        # IR,
+        # CAGR
+    ]
+    compare_ensemble(methods, models, quantiles, adaptive_outcomes, start_number=0, end_number=8, step=1,
+                     long_only=True, decay=0.9, to_csv=True, show_plot=True)

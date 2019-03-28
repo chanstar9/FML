@@ -8,8 +8,7 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
-from ksif import Portfolio
-from ksif.core.columns import *
+from ksif import *
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 from tqdm import tqdm
 
@@ -48,7 +47,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
-            data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
+            data_set[column_i] = data_set.groupby(by=[CODE])[column].apply(lambda x: x.shift(i)).reset_index(drop=True)
 
     if dummy_columns is not None:
         result_columns.extend(dummy_columns)
@@ -191,7 +190,6 @@ def save_concepts(only_old_data: bool):
     size_factors = [log_mktcap]
     momentum_factors = [MOM1, MOM12]
     quality_factors = [ROA, ROE, ROIC, S_A, DEBT_RATIO, EQUITY_RATIO, LIQ_RATIO]
-    volatility_factors = [VOL_1D]
 
     factor_groups = {}
 
@@ -199,22 +197,19 @@ def save_concepts(only_old_data: bool):
         for size_factor, size_name in zip([size_factors, []], ['size_', '']):
             for momentum_factor, momentum_name in zip([momentum_factors, []], ['momentum_', '']):
                 for quality_factor, quality_name in zip([quality_factors, []], ['quality_', '']):
-                    for volatility_factor, volatility_name in zip([volatility_factors, []], ['volatility_', '']):
-                        factor_group = []
-                        factor_group.extend(value_factor)
-                        factor_group.extend(size_factor)
-                        factor_group.extend(momentum_factor)
-                        factor_group.extend(quality_factor)
-                        factor_group.extend(volatility_factor)
-                        factor_names = []
-                        factor_names.extend(value_name)
-                        factor_names.extend(size_name)
-                        factor_names.extend(momentum_name)
-                        factor_names.extend(quality_name)
-                        factor_names.extend(volatility_name)
-                        factor_name = ''.join(factor_names)
-                        if factor_name:
-                            factor_groups[factor_name[:-1]] = factor_group
+                    factor_group = []
+                    factor_group.extend(value_factor)
+                    factor_group.extend(size_factor)
+                    factor_group.extend(momentum_factor)
+                    factor_group.extend(quality_factor)
+                    factor_names = []
+                    factor_names.extend(value_name)
+                    factor_names.extend(size_name)
+                    factor_names.extend(momentum_name)
+                    factor_names.extend(quality_name)
+                    factor_name = ''.join(factor_names)
+                    if factor_name:
+                        factor_groups[factor_name[:-1]] = factor_group
 
     factor_group_len = len(factor_groups)
 
@@ -232,15 +227,15 @@ def save_concepts(only_old_data: bool):
 if __name__ == '__main__':
     only_old_data = True
     save_concepts(only_old_data=only_old_data)
-    with Pool(os.cpu_count()) as p:
-        results = [p.apply_async(func, [only_old_data]) for func in [
-            save_all,
-            save_macro,
-            save_filter,
-            save_bollinger,
-            save_sector
-        ]]
-        for result in results:
-            result.wait()
-        p.close()
-        p.join()
+    # with Pool(os.cpu_count()) as p:
+    #     results = [p.apply_async(func, [only_old_data]) for func in [
+    #         save_all,
+    #         save_macro,
+    #         save_filter,
+    #         save_bollinger,
+    #         save_sector
+    #     ]]
+    #     for result in results:
+    #         result.wait()
+    #     p.close()
+    #     p.join()

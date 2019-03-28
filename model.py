@@ -4,13 +4,11 @@
 :Date: 2018-09-23
 """
 import gc
-from datetime import datetime
 from pathlib import Path
 
 import keras
 import tensorflow as tf
 from arch import arch_model
-from dateutil.relativedelta import relativedelta
 from keras import backend as k
 from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
@@ -18,12 +16,6 @@ from keras.models import Sequential
 
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
-
-TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
-
-TRAIN_START_DATE = (
-        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
-).strftime('%Y-%m-%d')
 
 pf = Portfolio()
 pf = pf[pf[DATE] >= START_DATE]
@@ -184,7 +176,7 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
 
 
 def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True,
-              progressive_learning=False, control_volatility_regime=False, early_stop=True, batch_normalization=True):
+              progressive_learning=False, control_volatility_regime=False, early_stop=False, batch_normalization=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -225,8 +217,8 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
         # MinMaxScaling x_test
         if x_test_scaling:
             minmaxscaling = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
-            for i, j in enumerate(x_test):
-                x_test[i] = minmaxscaling(j)
+            for column in range(x_test.shape[1]):
+                x_test[:, column] = minmaxscaling(x_test[:, column])
 
         # MinMaxScaling y_test
         if y_test_scaling:

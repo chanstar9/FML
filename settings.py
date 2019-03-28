@@ -3,11 +3,22 @@
 :Author: Jaekyoung Kim
 :Date: 2018. 9. 28.
 """
+from datetime import datetime
+
+from dateutil.relativedelta import relativedelta
 from keras.activations import linear, tanh, relu
 from keras.initializers import lecun_normal, lecun_uniform, he_normal, he_uniform, glorot_normal, glorot_uniform, zeros
 from keras.regularizers import l1, l2, l1_l2
 
 from data_generator import *
+
+TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
+
+TRAIN_START_DATE = (
+        datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
+).strftime('%Y-%m-%d')
+
+ADAPTIVE_WINDOW = 6
 
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
