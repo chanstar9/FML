@@ -18,7 +18,7 @@ TRAIN_START_DATE = (
         datetime.strptime(START_DATE, '%Y-%m-%d') + relativedelta(months=TRAINING_MONTHS + 1)
 ).strftime('%Y-%m-%d')
 
-ADAPTIVE_WINDOW = 6
+ADAPTIVE_WINDOW = 12
 
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'

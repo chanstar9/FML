@@ -30,6 +30,19 @@ def save_adaptive_ensemble(method: str, number: int, adaptive_outcome: str,
     assert number >= 0
     assert adaptive_outcome in ADAPTIVE_OUTCOMES
 
+    folder_name = '{}-{}-{}-{}-{}'.format(method, adaptive_outcome, long_only, quantile, decay)
+    file_name = '{}-{}.csv'.format(number, folder_name)
+    folder_path = join('adaptive_ensemble', folder_name)
+    file_path = join(folder_path, file_name)
+
+    print(file_name)
+
+    if not Path(folder_path).exists():
+        makedirs(folder_path)
+
+    if Path(file_path).exists():
+        return pd.read_csv(file_path)
+
     predictions = get_predictions(number)
 
     get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
@@ -43,30 +56,27 @@ def save_adaptive_ensemble(method: str, number: int, adaptive_outcome: str,
     if show_plot:
         Portfolio(ensemble_predictions[-1]).outcome(weighted=WEIGHT, show_plot=True)
 
-    folder_name = '{}-{}-{}-{}-{}'.format(method, adaptive_outcome, long_only, quantile, decay)
-    file_name = '{}-{}.csv'.format(number, folder_name)
-    folder_path = join('adaptive_ensemble', folder_name)
+    ensemble_predictions[-1].to_csv(file_path, index=False)
 
-    if not Path(folder_path).exists():
-        makedirs(folder_path)
-
-    ensemble_predictions[-1].to_csv(join(folder_path, file_name), index=False)
-
-    return ensemble_predictions
+    return ensemble_predictions[-1]
 
 
 if __name__ == '__main__':
     from multiprocessing import Pool
     import os
 
+    # save_adaptive_ensemble(PORTFOLIO_BLEND, 0, SR, True, 3, 0.1, False)
+
     params = [
-        # method, number, adaptive_outcome, long_only, quantile, decay, show_plot
-        (BLEND, 0, SR, True, 3, 0.9, True),
-        (BLEND, 0, SR, False, 3, 0.9, True),
-        (ARITHMETIC, 0, SR, True, 3, 0.9, True),
-        (ARITHMETIC, 0, SR, False, 3, 0.9, True),
+        # method, number, adaptive_outcome, quantile, decay
     ]
-    with Pool(min(os.cpu_count(), len(params))) as p:
+    for method in [PORTFOLIO_BLEND, SIGNAL_BLEND]:
+        for adaptive_outcome in [SR, IR]:
+            for quantile in [3, 5, 10]:
+                for decay in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+                    for number in range(10):
+                        params.append((method, number, adaptive_outcome, True, quantile, decay, False))
+    with Pool(min(os.cpu_count() // 2, len(params))) as p:
         rs = [p.apply_async(save_adaptive_ensemble, param) for param in params]
         for r in rs:
             r.wait()

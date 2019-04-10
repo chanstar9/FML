@@ -18,7 +18,7 @@ COUNT = 'count'
 CORRECT = 'correct'
 
 
-def _get_predictions(model_name, start_number, end_number):
+def get_predictions(model_name, start_number, end_number):
     file_names = [
         '{}-{}.csv'.format(x, model_name) for x in range(start_number, end_number + 1)
     ]
@@ -69,7 +69,7 @@ def get_ensemble(method: str, adaptive_outcome: str, model_name: str, start_numb
 
     result_file_name = _get_file_name(method, model_name, quantile)
 
-    predictions = _get_predictions(model_name, start_number, end_number)
+    predictions = get_predictions(model_name, start_number, end_number)
 
     get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
 
@@ -331,14 +331,29 @@ def compare_ensemble(methods, models, quantiles, adaptive_outcomes, start_number
 
 if __name__ == '__main__':
     models = [
-        'DNN8_1-size_momentum-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_size_momentum_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-momentum-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-momentum_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-size-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-size_momentum-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-size_momentum_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-size_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_momentum-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_momentum_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_quality-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_size-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_size_momentum-tahn-zeros-lecun_normal-none-0.5',
+        'DNN8_3-value_size_quality-tahn-zeros-lecun_normal-none-0.5',
     ]
     methods = [
-        BLEND,
-        ARITHMETIC,
+        PORTFOLIO_BLEND,
+        SIGNAL_BLEND,
     ]
     quantiles = [
-        3
+        3,
+        5
     ]
     adaptive_outcomes = [
         NONE,
@@ -346,5 +361,5 @@ if __name__ == '__main__':
         # IR,
         # CAGR
     ]
-    compare_ensemble(methods, models, quantiles, adaptive_outcomes, start_number=0, end_number=8, step=1,
-                     long_only=True, decay=0.9, to_csv=True, show_plot=True)
+    compare_ensemble(methods, models, quantiles, adaptive_outcomes, start_number=0, end_number=9, step=1,
+                     long_only=False, decay=0.9, to_csv=True, show_plot=True)

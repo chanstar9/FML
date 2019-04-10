@@ -8,7 +8,7 @@ from settings import *
 
 if __name__ == '__main__':
     backtest(param={
-        DATA_SET: 'value_size_quality',
+        DATA_SET: 'quality',
         BATCH_SIZE: 300,
         EPOCHS: 100,
         ACTIVATION: TAHN,

@@ -175,8 +175,8 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True,
-              progressive_learning=False, control_volatility_regime=False, early_stop=False, batch_normalization=False):
+def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=False, y_test_scaling=False,
+              progressive_learning=False, control_volatility_regime=False, early_stop=True, batch_normalization=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -282,9 +282,10 @@ def get_forward_predict(param, quantile, model_num, method, x_test_scaling=False
 
         # 0 = intersection / 1 = geometric
         get_ensemble_predictions = GET_ENSEMBLE_PREDICTIONS[method]
-        ensemble_predictions = get_ensemble_predictions(results, quantile)
+        ensemble_predictions = get_ensemble_predictions(results, quantile, long_only=True, adaptive_outcome=NONE,
+                                                        decay=0)
 
-        ensemble_predictions = ensemble_predictions[-1][CODE]
+        ensemble_predictions = ensemble_predictions[-1]
 
         # Save predictions
         ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)

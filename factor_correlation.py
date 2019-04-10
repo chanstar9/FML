@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from ksif import *
 
 if __name__ == '__main__':
@@ -15,4 +17,8 @@ if __name__ == '__main__':
     factors.extend(momentum_factors)
     factors.extend(quality_factors)
     portfolio = portfolio.dropna(subset=factors)
-    portfolio[factors].corr().to_csv('correlation.csv')
+    corr = portfolio[factors].corr()
+    corr.to_csv('correlation.csv')
+    sns.heatmap(corr, xticklabels=corr.columns, yticklabels=corr.columns, cmap='coolwarm')
+    plt.savefig('correlation.png')
+    plt.show()

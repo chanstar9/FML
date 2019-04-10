@@ -225,17 +225,17 @@ def save_concepts(only_old_data: bool):
 
 
 if __name__ == '__main__':
-    only_old_data = True
-    save_concepts(only_old_data=only_old_data)
-    # with Pool(os.cpu_count()) as p:
-    #     results = [p.apply_async(func, [only_old_data]) for func in [
-    #         save_all,
-    #         save_macro,
-    #         save_filter,
-    #         save_bollinger,
-    #         save_sector
-    #     ]]
-    #     for result in results:
-    #         result.wait()
-    #     p.close()
-    #     p.join()
+    only_old_data = False
+    # save_concepts(only_old_data=only_old_data)
+    with Pool(os.cpu_count()) as p:
+        results = [p.apply_async(func, [only_old_data]) for func in [
+            save_all,
+            # save_macro,
+            # save_filter,
+            # save_bollinger,
+            # save_sector
+        ]]
+        for result in results:
+            result.wait()
+        p.close()
+        p.join()
