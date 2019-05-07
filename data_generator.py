@@ -32,7 +32,12 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
         result_columns = [DATE, CODE, RET_1]
     else:
         result_columns = [DATE, CODE]
-    data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
+    if dummy_columns is not None:
+        data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)[
+            result_columns + rolling_columns + dummy_columns]
+    else:
+        data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)[result_columns + rolling_columns]
 
     # MinMaxScale_Return
     if apply_scaling_return:
@@ -48,7 +53,11 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
         for i in range(0, USED_PAST_MONTHS + 1):
             column_i = column + '_t-{}'.format(i)
             result_columns.append(column_i)
-            data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
+            if i == 0:
+                data_set[column_i] = data_set[column]
+            else:
+                data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
+            print(column_i)
 
     if dummy_columns is not None:
         result_columns.extend(dummy_columns)
@@ -59,27 +68,27 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
     return data_set
 
 
-def save_data(only_old_data: bool, portfolio: Portfolio, data_name: str, rolling_columns: list,
+def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_columns: list,
               dummy_columns: list = None,
               filtering_dataframe=None):
     print("Start saving {}...".format(data_name))
 
     portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
 
-    # old data
-    # RET_1이 존재하지 않는 마지막 달 제거
-    old_portfolio = portfolio.loc[~pd.isna(portfolio[RET_1]), :]
-    old_set = get_data_set(old_portfolio, rolling_columns, dummy_columns)
+    if old_data:
+        # old data
+        # RET_1이 존재하지 않는 마지막 달 제거
+        old_portfolio = portfolio.loc[~pd.isna(portfolio[RET_1]), :]
+        old_set = get_data_set(old_portfolio, rolling_columns, dummy_columns)
 
-    if isinstance(filtering_dataframe, pd.DataFrame) and not filtering_dataframe.empty:
-        filtering_dataframe = filtering_dataframe[[DATE, CODE]]
-        old_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
+        if isinstance(filtering_dataframe, pd.DataFrame) and not filtering_dataframe.empty:
+            filtering_dataframe = filtering_dataframe[[DATE, CODE]]
+            old_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
 
-    old_set.reset_index(drop=True).to_dataframe().to_hdf(
-        'data/{}.h5'.format(data_name), key='df', format='table', mode='w'
-    )
-
-    if not only_old_data:
+        old_set.reset_index(drop=True).to_dataframe().to_hdf(
+            'data/{}.h5'.format(data_name), key='df', format='table', mode='w'
+        )
+    else:
         # recent data
         recent_set = get_data_set(portfolio, rolling_columns, dummy_columns, return_y=False)
         # 마지막 달만 사용
@@ -182,7 +191,7 @@ def save_macro(only_old_data: bool):
     save_data(only_old_data, portfolio, MACRO, rolling_columns)
 
 
-def save_concepts(only_old_data: bool):
+def save_concepts(old_data: bool):
     log_mktcap = 'log_mktcap'
     portfolio = Portfolio()
     portfolio[log_mktcap] = np.log(portfolio[MKTCAP])
@@ -219,7 +228,7 @@ def save_concepts(only_old_data: bool):
     factor_group_len = len(factor_groups)
 
     with Pool(os.cpu_count()) as p:
-        rs = [p.apply_async(save_data, [only_old_data, pf, key, value]) for pf, (key, value) in zip(
+        rs = [p.apply_async(save_data, [old_data, pf, key, value]) for pf, (key, value) in zip(
             [portfolio for _ in range(factor_group_len)],
             factor_groups.items()
         )]
@@ -230,10 +239,11 @@ def save_concepts(only_old_data: bool):
 
 
 if __name__ == '__main__':
-    only_old_data = True
-    save_concepts(only_old_data=only_old_data)
+    old_data = False
+    save_concepts(old_data=old_data)
+    save_all(old_data)
     with Pool(os.cpu_count()) as p:
-        results = [p.apply_async(func, [only_old_data]) for func in [
+        results = [p.apply_async(func, [old_data]) for func in [
             save_all,
             save_macro,
             save_filter,
