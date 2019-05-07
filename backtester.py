@@ -8,14 +8,14 @@ from settings import *
 
 if __name__ == '__main__':
     backtest(param={
-        DATA_SET: ALL,
+        DATA_SET: 'value_size_momentum_quality_volatility',
         BATCH_SIZE: 300,
         EPOCHS: 100,
-        ACTIVATION: LINEAR,
-        BIAS_INITIALIZER: HE_UNIFORM,
-        KERNEL_INITIALIZER: GLOROT_UNIFORM,
+        ACTIVATION: TAHN,
+        BIAS_INITIALIZER: ZEROS,
+        KERNEL_INITIALIZER: LECUN_NORMAL,
         BIAS_REGULARIZER: NONE,
-        HIDDEN_LAYER: DNN8_1,
-        DROPOUT: False,
+        HIDDEN_LAYER: DNN8_4,
+        DROPOUT: True,
         DROPOUT_RATE: 0.5
-    }, start_number=0, end_number=9, max_pool=5)
+    }, start_number=0, end_number=119, max_pool=12)
