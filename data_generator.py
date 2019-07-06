@@ -114,25 +114,6 @@ def save_all(only_old_data: bool):
     save_data(only_old_data, portfolio, ALL, rolling_columns)
 
 
-def save_filter(only_old_data: bool):
-    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    portfolio = Portfolio()
-    # 최소 시가총액 100억
-    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-
-    # 2 < PER < 10.0 (http://pluspower.tistory.com/9)
-    portfolio = portfolio.loc[(portfolio[PER] < 10) & (portfolio[PER] > 2)]
-    # 0.2 < PBR < 1.0
-    portfolio = portfolio.loc[(portfolio[PBR] < 1) & (portfolio[PBR] > 0.2)]
-    # 2 < PCR < 8
-    portfolio = portfolio.loc[(portfolio[PCR] < 8) & (portfolio[PCR] > 2)]
-    # 0 < PSR < 0.8
-    portfolio = portfolio.loc[portfolio[PSR] < 0.8]
-
-    save_data(only_old_data, portfolio, FILTER, rolling_columns)
-
-
 def save_bollinger(only_old_data: bool):
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
                        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
