@@ -114,23 +114,6 @@ def save_all(only_old_data: bool):
     save_data(only_old_data, portfolio, ALL, rolling_columns)
 
 
-def save_bollinger(only_old_data: bool):
-    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
-    portfolio = Portfolio()
-    # 최소 시가총액 100억
-    portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
-
-    # Bollinger
-    portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
-    portfolio['mean'] = portfolio.groupby(CODE)[ENDP].rolling(20).mean().reset_index(drop=True)
-    portfolio['std'] = portfolio.groupby(CODE)[ENDP].rolling(20).std().reset_index(drop=True)
-    portfolio[BOLLINGER] = portfolio['mean'] - 2 * portfolio['std']
-    bollingers = portfolio.loc[portfolio[ENDP] < portfolio[BOLLINGER], [DATE, CODE]]
-
-    save_data(only_old_data, portfolio, BOLLINGER, rolling_columns, filtering_dataframe=bollingers)
-
-
 def save_sector(only_old_data: bool):
     columns = [DATE, CODE, RET_1]
     rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
@@ -227,8 +210,6 @@ if __name__ == '__main__':
         results = [p.apply_async(func, [old_data]) for func in [
             save_all,
             save_macro,
-            save_filter,
-            save_bollinger,
             save_sector
         ]]
         for result in results:

@@ -462,10 +462,10 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
 
 if __name__ == '__main__':
     models = [
-        'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
+        'DNN8_2-sector-linear-he_uniform-glorot_uniform-none',
     ]
     methods = [
-        INTERSECTION,
+        # INTERSECTION,
         GEOMETRIC
     ]
     quantiles = [
@@ -475,4 +475,4 @@ if __name__ == '__main__':
         20,
         40
     ]
-    compare_ensemble(methods, models, quantiles, start_number=0, end_number=9, step=1, to_csv=True, show_plot=True)
+    compare_ensemble(methods, models, quantiles, start_number=0, end_number=2, step=1, to_csv=True, show_plot=True)
