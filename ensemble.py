@@ -462,7 +462,7 @@ def compare_ensemble(methods, models, quantiles, start_number: int = 0, end_numb
 
 if __name__ == '__main__':
     models = [
-        'DNN8_2-sector-linear-he_uniform-glorot_uniform-none'
+        'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
     ]
     methods = [
         # INTERSECTION,

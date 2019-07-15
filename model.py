@@ -50,7 +50,7 @@ def get_train_test_set(data_set_key, test_month):
     return training_set, test_set
 
 
-def train_model(month, param, early_stop, batch_normalization):
+def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
 
     data_train_array = data_trains.values
@@ -60,6 +60,21 @@ def train_model(month, param, early_stop, batch_normalization):
     y_train = data_train_array[:, 2:3]
     x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+
+    # MinMaxScaling
+    if minmaxscaling:
+        minmaxscaling_f = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
+        # x_train
+        for i, j in enumerate(x_train):
+            x_train[i] = minmaxscaling_f(j)
+        # x_test
+        for i, j in enumerate(x_test):
+            x_test[i] = minmaxscaling_f(j)
+        # y_train
+        y_train = np.apply_along_axis(minmaxscaling_f, 0, y_train)
+        # actual_test
+        actual_test[RET_1] = (actual_test[RET_1] - actual_test[RET_1].min()) / (
+                    actual_test[RET_1].max() - actual_test[RET_1].min())
 
     input_dim = x_train.shape[1]
 
