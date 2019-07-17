@@ -105,11 +105,35 @@ def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_colu
 
 
 def save_all(only_old_data: bool):
-    rolling_columns = [E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
-                       MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO]
+    columns = [DATE, CODE, RET_1]
+    rolling_columns = [
+        E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
+        MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
+        TERM_SPREAD_KOR, TERM_SPREAD_US, CREDIT_SPREAD_KOR, LOG_USD2KRW, LOG_CHY2KRW, LOG_EURO2KRW,
+        TED_SPREAD, LOG_NYSE, LOG_NASDAQ, LOG_OIL
+    ]
+    columns.extend(rolling_columns)
+
     portfolio = Portfolio()
     # 최소 시가총액 100억
     portfolio = portfolio.loc[portfolio[MKTCAP] > 10000000000, :]
+
+    ### sector ###
+    # KRX_SECTOR가 존재하지 않는 데이터 제거
+    portfolio.dropna(subset=[KRX_SECTOR], inplace=True)
+    portfolio = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)
+
+    # sector를 숫자로 나타냄
+    label_encoder = LabelEncoder()
+    labeled_sector = label_encoder.fit_transform(portfolio[KRX_SECTOR])
+    krx_sectors = label_encoder.classes_
+    # 숫자로 나타낸 것을 모스부호로 표현
+    one_hot_encoder = OneHotEncoder(sparse=False)
+    one_hot_encoded_sector = one_hot_encoder.fit_transform(labeled_sector.reshape(len(labeled_sector), 1))
+    # 기존 데이터에 붙히기
+    df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors).reset_index(drop=True)
+    portfolio[krx_sectors] = df_one_hot_encoded_sector
+    ### sector ###
 
     save_data(only_old_data, portfolio, ALL, rolling_columns)
 
