@@ -9,7 +9,7 @@ from keras import backend as K
 
 if __name__ == '__main__':
     backtest(param={
-        DATA_SET: SECTOR,
+        DATA_SET: ALL,
         BATCH_SIZE: 300,
         EPOCHS: 100,
         ACTIVATION: LINEAR,
