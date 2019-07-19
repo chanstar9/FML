@@ -33,7 +33,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
     else:
         result_columns = [DATE, CODE]
 
-    if dummy_columns is not None:
+    if dummy_columns:
         data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)[
             result_columns + rolling_columns + dummy_columns]
     else:
@@ -59,7 +59,7 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
                 data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
             print(column_i)
 
-    if dummy_columns is not None:
+    if dummy_columns:
         result_columns.extend(dummy_columns)
 
     data_set = data_set[result_columns]
@@ -173,7 +173,7 @@ def save_sector(only_old_data: bool):
     # 기존 데이터에 붙히기
     df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors).reset_index(drop=True)
     portfolio[krx_sectors] = df_one_hot_encoded_sector
-
+    krx_sectors = list(krx_sectors)
     save_data(only_old_data, portfolio, SECTOR, rolling_columns, krx_sectors)
 
 
@@ -239,18 +239,19 @@ def save_concepts(old_data: bool):
 
 
 if __name__ == '__main__':
-    old_data = False
-    save_concepts(old_data=old_data)
+    old_data = True
+    # save_concepts(old_data=old_data)
     save_all(old_data)
-    with Pool(os.cpu_count()) as p:
-        results = [p.apply_async(func, [old_data]) for func in [
-            save_all,
-            save_macro,
-            save_filter,
-            save_bollinger,
-            save_sector
-        ]]
-        for result in results:
-            result.wait()
-        p.close()
-        p.join()
+    # with Pool(os.cpu_count()) as p:
+    #     results = [p.apply_async(func, [old_data]) for func in [
+    #         save_all,
+    #         save_macro,
+    #         save_filter,
+    #         save_bollinger,
+    #         save_sector
+    #     ]]
+    #     for result in results:
+    #         result.wait()
+    #     p.close()
+    #     p.join()
+    # save_sector(old_data)

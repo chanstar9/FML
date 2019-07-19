@@ -172,7 +172,7 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True,
+def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=False, y_test_scaling=False,
               control_volatility_regime=False, early_stop=True, batch_normalization=True):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
