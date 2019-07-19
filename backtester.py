@@ -5,17 +5,19 @@
 """
 from model import *
 from settings import *
+from keras import backend as K
 
 if __name__ == '__main__':
     backtest(param={
-        DATA_SET: ALL,
+        DATA_SET: SECTOR,
         BATCH_SIZE: 300,
         EPOCHS: 100,
         ACTIVATION: LINEAR,
         BIAS_INITIALIZER: HE_UNIFORM,
         KERNEL_INITIALIZER: GLOROT_UNIFORM,
         BIAS_REGULARIZER: NONE,
-        HIDDEN_LAYER: DNN8_1,
+        HIDDEN_LAYER: DNN8_2,
         DROPOUT: False,
         DROPOUT_RATE: 0.5
-    }, start_number=0, end_number=9, max_pool=10)
+    }, start_number=5, end_number=9, max_pool=5)
+    K.tensorflow_backend._get_available_gpus()
