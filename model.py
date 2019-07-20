@@ -65,7 +65,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     if minmaxscaling:
         year = 13
         minmaxscaling_f = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
-        ind = [i for i, j in enumerate(a) if i % year == 0]
+        ind = [i for i, j in enumerate(x_train) if i % year == 0]
 
         # x_train
         for i in ind:
