@@ -135,7 +135,7 @@ def save_all(only_old_data: bool):
     portfolio[krx_sectors] = df_one_hot_encoded_sector
     ### sector ###
 
-    save_data(only_old_data, portfolio, ALL, rolling_columns)
+    save_data(only_old_data, portfolio, ALL, rolling_columns, KRX_SECTOR)
 
 
 def save_sector(only_old_data: bool):
@@ -228,15 +228,15 @@ def save_concepts(old_data: bool):
 
 if __name__ == '__main__':
     old_data = False
-    save_concepts(old_data=old_data)
+    # save_concepts(old_data=old_data)
     save_all(old_data)
-    with Pool(os.cpu_count()) as p:
-        results = [p.apply_async(func, [old_data]) for func in [
-            save_all,
-            save_macro,
-            save_sector
-        ]]
-        for result in results:
-            result.wait()
-        p.close()
-        p.join()
+    # with Pool(os.cpu_count()) as p:
+    #     results = [p.apply_async(func, [old_data]) for func in [
+    #         save_all,
+    #         save_macro,
+    #         save_sector
+    #     ]]
+    #     for result in results:
+    #         result.wait()
+    #     p.close()
+    #     p.join()
