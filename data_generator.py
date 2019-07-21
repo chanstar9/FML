@@ -135,7 +135,7 @@ def save_all(only_old_data: bool):
     portfolio[krx_sectors] = df_one_hot_encoded_sector
     ### sector ###
 
-    save_data(only_old_data, portfolio, ALL, rolling_columns, KRX_SECTOR)
+    save_data(only_old_data, portfolio, ALL, rolling_columns, krx_sectors)
 
 
 def save_sector(only_old_data: bool):
