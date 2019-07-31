@@ -26,8 +26,7 @@ START_DATE = '2004-05-31'
 USED_PAST_MONTHS = 12  # At a time, use past 12 months data and current month data.
 
 
-def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, apply_scaling_return=False,
-                 apply_scaling_rolling_columns=False):
+def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True):
     if return_y:
         result_columns = [DATE, CODE, RET_1]
     else:
@@ -38,16 +37,6 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True, 
             result_columns + rolling_columns + dummy_columns]
     else:
         data_set = portfolio.sort_values(by=[CODE, DATE]).reset_index(drop=True)[result_columns + rolling_columns]
-
-    # MinMaxScale_Return
-    if apply_scaling_return:
-        data_set[RET_1] = data_set.groupby(by=[DATE])[RET_1].apply(
-            lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0)))
-
-    if apply_scaling_rolling_columns:
-        for i in rolling_columns:
-            data_set[i] = data_set.groupby(by=[DATE])[i].apply(
-                lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0)))
 
     for column in tqdm(rolling_columns):
         for i in range(0, USED_PAST_MONTHS + 1):
@@ -104,7 +93,7 @@ def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_colu
         )
 
 
-def save_all(only_old_data: bool):
+def save_all(old_data: bool):
     columns = [DATE, CODE, RET_1]
     rolling_columns = [
         E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
@@ -133,9 +122,9 @@ def save_all(only_old_data: bool):
     # 기존 데이터에 붙히기
     df_one_hot_encoded_sector = pd.DataFrame(one_hot_encoded_sector, columns=krx_sectors).reset_index(drop=True)
     portfolio[krx_sectors] = df_one_hot_encoded_sector
-    ### sector ###
+    krx_sectors = list(krx_sectors)
 
-    save_data(only_old_data, portfolio, ALL, rolling_columns, krx_sectors)
+    save_data(old_data, portfolio, ALL, rolling_columns, krx_sectors)
 
 
 def save_sector(only_old_data: bool):

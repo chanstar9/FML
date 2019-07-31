@@ -65,7 +65,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     if minmaxscaling:
         year = 13
         minmaxscaling_f = lambda x: (x - x.min()) / (x.max() - x.min())
-        ind = [i for i, j in enumerate(x_train) if i % year == 0]
+        ind = [i for i in range(len(x_train[0])) if i % year == 0]
 
         # x_train
         for i in ind:
@@ -77,7 +77,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         y_train = np.apply_along_axis(minmaxscaling_f, 0, y_train)
         # actual_test
         actual_test[RET_1] = (actual_test[RET_1] - actual_test[RET_1].min()) / (
-                    actual_test[RET_1].max() - actual_test[RET_1].min())
+                actual_test[RET_1].max() - actual_test[RET_1].min())
 
     input_dim = x_train.shape[1]
 
