@@ -50,7 +50,7 @@ def get_train_test_set(data_set_key, test_month):
     return training_set, test_set
 
 
-def train_model(month, param, early_stop, batch_normalization):
+def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
 
     data_train_array = data_trains.values
@@ -60,6 +60,24 @@ def train_model(month, param, early_stop, batch_normalization):
     y_train = data_train_array[:, 2:3]
     x_test = data_test_array[:, 3:]
     actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+
+    # MinMaxScaling
+    if minmaxscaling:
+        year = 13
+        minmaxscaling_f = lambda x: (x - x.min()) / (x.max() - x.min())
+        ind = [i for i in range(len(x_train[0])) if i % year == 0]
+
+        # x_train
+        for i in ind:
+            x_train[:, i:(i + year)] = minmaxscaling_f(x_train[:, i:(i + year)])
+        # x_test
+        for i in ind:
+            x_test[:, i:(i + year)] = minmaxscaling_f(x_test[:, i:(i + year)])
+        # y_train
+        y_train = np.apply_along_axis(minmaxscaling_f, 0, y_train)
+        # actual_test
+        actual_test[RET_1] = (actual_test[RET_1] - actual_test[RET_1].min()) / (
+                actual_test[RET_1].max() - actual_test[RET_1].min())
 
     input_dim = x_train.shape[1]
 
@@ -172,7 +190,7 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=True, y_test_scaling=True,
+def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=True,
               control_volatility_regime=False, early_stop=True, batch_normalization=True):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
@@ -209,17 +227,7 @@ def _backtest(case_number: int, param: dict, test_months: list, x_test_scaling=T
                 continue
 
         model, x_test, y_test = train_model(month, param, early_stop=early_stop,
-                                            batch_normalization=batch_normalization)
-
-        # MinMaxScaling x_test
-        if x_test_scaling:
-            minmaxscaling = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
-            for i, j in enumerate(x_test):
-                x_test[i] = minmaxscaling(j)
-
-        # MinMaxScaling y_test
-        if y_test_scaling:
-            y_test[RET_1] = (y_test[RET_1] - y_test[RET_1].min()) / (y_test[RET_1].max() - y_test[RET_1].min())
+                                            batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
 
         df_prediction = get_predictions(model, x_test, y_test)
         df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
@@ -256,12 +264,6 @@ def get_forward_predict(param, quantile, model_num, method, x_test_scaling=False
     month = x_test[DATE].iloc[0]
     codes = x_test[[CODE]]
     x_test = x_test.drop([DATE, CODE], axis=1)
-
-    # MinMaxScaling x_test
-    if x_test_scaling:
-        minmaxscaling = lambda x: (x - x.min(axis=0)) / (x.max(axis=0) - x.min(axis=0))
-        for i, j in enumerate(x_test):
-            x_test[i] = minmaxscaling(j)
 
     with Pool(min(os.cpu_count(), model_num)) as p:
         # noinspection PyTypeChecker

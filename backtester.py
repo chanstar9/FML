@@ -15,7 +15,7 @@ if __name__ == '__main__':
         BIAS_INITIALIZER: HE_UNIFORM,
         KERNEL_INITIALIZER: GLOROT_UNIFORM,
         BIAS_REGULARIZER: NONE,
-        HIDDEN_LAYER: DNN8_1,
+        HIDDEN_LAYER: DNN8_2,
         DROPOUT: False,
         DROPOUT_RATE: 0.5
-    }, start_number=0, end_number=9, max_pool=10)
+    }, start_number=0, end_number=9, max_pool=7)

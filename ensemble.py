@@ -465,7 +465,7 @@ if __name__ == '__main__':
         'DNN8_2-all-linear-he_uniform-glorot_uniform-none',
     ]
     methods = [
-        INTERSECTION,
+        # INTERSECTION,
         GEOMETRIC
     ]
     quantiles = [
