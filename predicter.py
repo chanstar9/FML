@@ -4,7 +4,7 @@
 :Date: 2018-09-21
 """
 # noinspection PyUnresolvedReferences
-from ensemble import INTERSECTION, GEOMETRIC
+from ensemble import INTERSECTION, GEOMETRIC, ARITHMETIC
 from model import *
 from settings import *
 

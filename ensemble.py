@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 INTERSECTION = 'intersection'
 GEOMETRIC = 'geometric'
+ARITHMETIC = 'arithmetic'
 
 QUANTILE = 'quantile'
 PREDICTED_RET_1 = 'predict_return_1'
@@ -62,11 +63,34 @@ def get_geometric_ensemble_predictions(predictions, quantile: int = 40):
         DATE        | (datetime64)
         CODE        | (str)
     """
+    # Geometric mean
+    predictions[0][PREDICTED_RET_1] = predictions[0][PREDICTED_RET_1] + 1
+    ensemble_predictions = [predictions[0]]
+    for current_prediction in predictions[1:]:
+        previous_ensemble = ensemble_predictions[-1]
+        current_ensemble = current_prediction
+        current_ensemble[PREDICTED_RET_1] = previous_ensemble[PREDICTED_RET_1] * (1 + current_prediction[PREDICTED_RET_1])
+        ensemble_predictions.append(current_ensemble)
+    for index, ensemble_prediction in enumerate(ensemble_predictions):
+        ensemble_prediction[PREDICTED_RET_1] = ensemble_prediction[PREDICTED_RET_1] ** (1 / (index + 1)) - 1
+
+    # Select the top quantile
+    ensemble_predictions = _select_predictions(ensemble_predictions, quantile, [DATE, CODE])
+
+    return ensemble_predictions
+
+
+def get_arithmetic_ensemble_predictions(predictions, quantile: int = 40):
+    """
+    :return ensemble_predictions:
+        DATE        | (datetime64)
+        CODE        | (str)
+    """
     # Take exponential
     for prediction in predictions:
         prediction[PREDICTED_RET_1] = np.exp(prediction[PREDICTED_RET_1])
 
-    # Geometric mean
+    # Arithmetic mean
     ensemble_predictions = [predictions[0]]
     for current_prediction in predictions[1:]:
         previous_ensemble = ensemble_predictions[-1]
@@ -112,12 +136,14 @@ def _get_predictions(model_name, start_number, end_number):
 
 METHODS = [
     INTERSECTION,
-    GEOMETRIC
+    GEOMETRIC,
+    ARITHMETIC
 ]
 
 GET_ENSEMBLE_PREDICTIONS = {
     INTERSECTION: get_intersection_ensemble_predictions,
-    GEOMETRIC: get_geometric_ensemble_predictions
+    GEOMETRIC: get_geometric_ensemble_predictions,
+    ARITHMETIC: get_arithmetic_ensemble_predictions
 }
 
 
@@ -466,13 +492,10 @@ if __name__ == '__main__':
     ]
     methods = [
         # INTERSECTION,
+        # ARITHMETIC,
         GEOMETRIC
     ]
     quantiles = [
-        2,
-        5,
-        10,
-        20,
         40
     ]
     compare_ensemble(methods, models, quantiles, start_number=0, end_number=9, step=1, to_csv=True, show_plot=True)

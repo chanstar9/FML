@@ -190,7 +190,7 @@ def backtest(param, start_number=0, end_number=9, max_pool=os.cpu_count()):
         p.join()
 
 
-def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=True,
+def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=False,
               control_volatility_regime=False, early_stop=True, batch_normalization=True):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
@@ -255,7 +255,7 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Tr
 
 
 # noinspection PyUnresolvedReferences
-def get_forward_predict(param, quantile, model_num, method, x_test_scaling=False):
+def get_forward_predict(param, quantile, model_num, method):
     print("Param: {}".format(param))
 
     recent_data_set = param[DATA_SET] + '_recent'
@@ -289,7 +289,7 @@ def get_forward_predict(param, quantile, model_num, method, x_test_scaling=False
         ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
 
 
-def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_normalization=True):
+def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_normalization=True, minmaxscaling=False):
     tf.logging.set_verbosity(3)
     # TensorFlow wizardry
     config = tf.ConfigProto()
@@ -298,7 +298,7 @@ def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_nor
     # Create a session with the above options specified.
     k.set_session(tf.Session(config=config))
 
-    model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization)
+    model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
     # get forward prediction
     forward_predictions = get_predictions(model, x_test)
     codes[PREDICTED_RET_1] = forward_predictions
