@@ -56,7 +56,7 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
     if network_architecture!='rnn':
         train_start_month = months[test_index - TRAINING_MONTHS - 1]
     else:
-        train_start_month = months[test_index - TRAINING_MONTHS - 12 - 1]
+        train_start_month = months[max(test_index - TRAINING_MONTHS - 12 - 1,0)]
     test_start_month = months[test_index - 12]
 
 
