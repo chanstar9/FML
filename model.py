@@ -16,6 +16,8 @@ from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
 
+from keras import layers
+
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
 
@@ -32,9 +34,14 @@ months = sorted(pf[DATE].unique())[:-1]
 result_columns = [RET_1]
 
 
-def get_train_test_set(data_set_key, test_month, progressive_learning):
-    training_set = get_data_set(data_set_key)
-    test_set = get_data_set(data_set_key)
+def get_train_test_set(data_set_key, test_month, progressive_learning, network_architecture):
+    if network_architecture!='rnn':
+        training_set = get_data_set(data_set_key)
+        test_set = get_data_set(data_set_key)
+    else:
+        pf[DATE] = pd.to_datetime(pf[DATE])
+        training_set = pf
+        test_set = pf
 
     if test_month in months:
         test_index = months.index(test_month)
@@ -60,8 +67,15 @@ def get_train_test_set(data_set_key, test_month, progressive_learning):
 
 
 def train_model(month, param, progressive_learning, early_stop, batch_normalization):
+    if 'rnn' in param[HIDDEN_LAYER].lower():
+        network_architecture = 'rnn'
+    else:
+        network_architecture = None
+
     data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month,
-                                                progressive_learning=progressive_learning)
+                                                progressive_learning=progressive_learning,
+                                                network_architecture = network_architecture
+                                                )
 
     data_train_arrays = [data_train.values for data_train in data_trains]
     data_test_array = data_test.values
@@ -85,29 +99,60 @@ def train_model(month, param, progressive_learning, early_stop, batch_normalizat
     dropout_rate = param[DROPOUT_RATE]
 
     model = Sequential()
-    model.add(Dense(hidden_layer[0], input_dim=input_dim,
-                    activation=activation,
-                    bias_initializer=bias_initializer,
-                    kernel_initializer=kernel_initializer,
-                    bias_regularizer=bias_regularizer
-                    ))
-    if batch_normalization:
-        model.add(BatchNormalization())
-    if dropout:
-        model.add(Dropout(dropout_rate))
 
-    for hidden_layer in hidden_layer[1:]:
-        model.add(Dense(hidden_layer,
+    # input node
+
+    if network_architecture != 'rnn':
+        model.add(Dense(hidden_layer[0], input_dim=input_dim,
                         activation=activation,
                         bias_initializer=bias_initializer,
-                        kernel_initializer=kernel_initializer
+                        kernel_initializer=kernel_initializer,
+                        bias_regularizer=bias_regularizer
                         ))
         if batch_normalization:
             model.add(BatchNormalization())
         if dropout:
             model.add(Dropout(dropout_rate))
 
-    model.add(Dense(1))
+        for hidden_layer in hidden_layer[1:]:
+            model.add(Dense(hidden_layer,
+                            activation=activation,
+                            bias_initializer=bias_initializer,
+                            kernel_initializer=kernel_initializer
+                            ))
+            if batch_normalization:
+                model.add(BatchNormalization())
+            if dropout:
+                model.add(Dropout(dropout_rate))
+
+        model.add(Dense(1))
+    else:
+        model.add(layers.GRU(hidden_layer[0], input_dim=input_dim,
+                        activation=activation,
+                        bias_initializer=bias_initializer,
+                        kernel_initializer=kernel_initializer,
+                        bias_regularizer=bias_regularizer,
+                        return_sequences=True
+                        ))
+        if batch_normalization:
+            model.add(BatchNormalization())
+        if dropout:
+            model.add(Dropout(dropout_rate))
+
+        for hidden_layer in hidden_layer[1:]:
+            model.add(layers.GRU(hidden_layer,
+                            activation=activation,
+                            bias_initializer=bias_initializer,
+                            kernel_initializer=kernel_initializer,
+                            return_sequences=True
+                            ))
+            if batch_normalization:
+                model.add(BatchNormalization())
+            if dropout:
+                model.add(Dropout(dropout_rate))
+
+        model.add(Dense(1))
+
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
 
