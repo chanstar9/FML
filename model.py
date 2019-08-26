@@ -53,10 +53,18 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
         test_index = len(months)
     assert test_index - TRAINING_MONTHS - 1 >= 0, "test_month is too early"
 
-    train_start_month = months[test_index - TRAINING_MONTHS - 1]
+    if network_architecture!='rnn':
+        train_start_month = months[test_index - TRAINING_MONTHS - 1]
+    else:
+        train_start_month = months[test_index - TRAINING_MONTHS - 12 - 1]
+    test_start_month = months[test_index - 12]
+
 
     training_set = training_set.loc[(training_set[DATE] >= train_start_month) & (training_set[DATE] < test_month), :]
-    test_set = test_set.loc[test_set[DATE] == test_month, :]
+    if network_architecture!='rnn':
+        test_set = test_set.loc[test_set[DATE] == test_month, :]
+    else:
+        test_set = test_set.loc[(test_set[DATE] >= test_start_month) & (test_set[DATE] <= test_month), :]
 
     return training_set, test_set
 
@@ -80,25 +88,47 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         x_test = data_test_array[:, 3:]
         actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
     else:
-        _full_list = []
+        _full_list = dict()
         _code_list = []
         for _code, _data in data_trains.groupby(CODE):
-            if _data.shape[0] > 36:
-                _full_list.append(_data.values)
+            if _data.shape[0] >= 13:
+                _full_list[_code] = _data.values
                 _code_list.append(_code)
-        data_train_array = np.array(_full_list)
+
+        _full_list_test = dict()
+        _code_list_test = []
+        for _code, _data in data_test.groupby(CODE):
+            if _data.shape[0] == 13:
+                _full_list_test[_code] = _data.values
+                _code_list_test.append(_code)
+
+        _code_list_final = list(set(_code_list).intersection(set(_code_list_test)))
+
+        _temp_train_list = []
+        for _code in _code_list_final:
+            _data = _full_list[_code]
+            for i in range(_data.shape[0] - 13 + 1):
+                _temp_train_list.append(_data[i:i + 13])
+
+
+        data_train_array = np.array(_temp_train_list)
 
         data_test_rnn = data_test.set_index(CODE)
-        data_test_array_pandas = data_test_rnn.loc[_code_list, :].reset_index()
+        data_test_array_pandas = data_test_rnn.loc[_code_list_final, :].reset_index()
 
-        _nested_firm_number = len(_code_list)
-
-        data_test_array = data_test_array_pandas.values.reshape(_nested_firm_number, -1, data_test_array_pandas.shape[-1])
+        _temp_test_list = []
+        for _code in _code_list_final:
+            _data = _full_list_test[_code]
+            _temp_test_list.append(_data)
+        data_test_array = np.array(_temp_test_list)
 
         x_train = data_train_array[:, :, 3:]
         y_train = data_train_array[:, :, 2:3]
         x_test = data_test_array[:, :, 3:]
-        actual_test = data_test_rnn.loc[_code_list, [DATE, RET_1]].reset_index()
+
+        _actual_test = data_test_rnn[data_test_rnn[DATE]==month]
+
+        actual_test = _actual_test.loc[_code_list_final, [DATE, RET_1]].reset_index()
 
         input_length = x_train.shape[1]
 
