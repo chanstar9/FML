@@ -54,6 +54,7 @@ DNN8_2 = 'DNN8_2'
 DNN8_3 = 'DNN8_3'
 DNN8_4 = 'DNN8_4'
 
+RNN8_2 = 'RNN8_2'
 
 class LazyDict(dict):
 

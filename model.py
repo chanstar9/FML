@@ -16,6 +16,8 @@ from keras.callbacks import EarlyStopping
 from keras.layers import Dense, Dropout, BatchNormalization
 from keras.models import Sequential
 
+from keras import layers
+
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
 
@@ -32,9 +34,18 @@ months = sorted(pf[DATE].unique())[:-1]
 result_columns = [RET_1]
 
 
-def get_train_test_set(data_set_key, test_month):
+def get_train_test_set(data_set_key, test_month, network_architecture):
     training_set = get_data_set(data_set_key)
     test_set = get_data_set(data_set_key)
+
+    if network_architecture=='rnn':
+        base_columns = [col for col in training_set.columns if '_t-' not in col]
+        factor_columns = [col for col in training_set.columns if '_t-0' in col]
+
+        rnn_columns = base_columns + factor_columns
+
+        training_set = training_set[rnn_columns]
+        test_set = test_set[rnn_columns]
 
     if test_month in months:
         test_index = months.index(test_month)
@@ -51,15 +62,45 @@ def get_train_test_set(data_set_key, test_month):
 
 
 def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
-    data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month)
+    if 'rnn' in param[HIDDEN_LAYER].lower():
+        network_architecture = 'rnn'
+    else:
+        network_architecture = None
 
-    data_train_array = data_trains.values
-    data_test_array = data_test.values
+    data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month,
+                                                network_architecture = network_architecture
+                                                )
 
-    x_train = data_train_array[:, 3:]
-    y_train = data_train_array[:, 2:3]
-    x_test = data_test_array[:, 3:]
-    actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+    if network_architecture != 'rnn':
+        data_train_array = data_trains.values
+        data_test_array = data_test.values
+
+        x_train = data_train_array[:, 3:]
+        y_train = data_train_array[:, 2:3]
+        x_test = data_test_array[:, 3:]
+        actual_test = data_test.loc[:, [DATE, CODE, RET_1]].reset_index(drop=True)
+    else:
+        _full_list = []
+        _code_list = []
+        for _code, _data in data_trains.groupby(CODE):
+            if _data.shape[0] > 36:
+                _full_list.append(_data.values)
+                _code_list.append(_code)
+        data_train_array = np.array(_full_list)
+
+        data_test_rnn = data_test.set_index(CODE)
+        data_test_array_pandas = data_test_rnn.loc[_code_list, :].reset_index()
+
+        _nested_firm_number = len(_code_list)
+
+        data_test_array = data_test_array_pandas.values.reshape(_nested_firm_number, -1, data_test_array_pandas.shape[-1])
+
+        x_train = data_train_array[:, :, 3:]
+        y_train = data_train_array[:, :, 2:3]
+        x_test = data_test_array[:, :, 3:]
+        actual_test = data_test_rnn.loc[_code_list, [DATE, RET_1]].reset_index()
+
+        input_length = x_train.shape[1]
 
     # MinMaxScaling
     if minmaxscaling:
@@ -79,7 +120,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         actual_test[RET_1] = (actual_test[RET_1] - actual_test[RET_1].min()) / (
                 actual_test[RET_1].max() - actual_test[RET_1].min())
 
-    input_dim = x_train.shape[1]
+    input_dim = x_train.shape[-1]
 
     # Parameters
     batch_size = param[BATCH_SIZE]
@@ -93,29 +134,60 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     dropout_rate = param[DROPOUT_RATE]
 
     model = Sequential()
-    model.add(Dense(hidden_layer[0], input_dim=input_dim,
-                    activation=activation,
-                    bias_initializer=bias_initializer,
-                    kernel_initializer=kernel_initializer,
-                    bias_regularizer=bias_regularizer
-                    ))
-    if batch_normalization:
-        model.add(BatchNormalization())
-    if dropout:
-        model.add(Dropout(dropout_rate))
 
-    for hidden_layer in hidden_layer[1:]:
-        model.add(Dense(hidden_layer,
+    # input node
+
+    if network_architecture != 'rnn':
+        model.add(Dense(hidden_layer[0], input_dim=input_dim,
                         activation=activation,
                         bias_initializer=bias_initializer,
-                        kernel_initializer=kernel_initializer
+                        kernel_initializer=kernel_initializer,
+                        bias_regularizer=bias_regularizer
                         ))
         if batch_normalization:
             model.add(BatchNormalization())
         if dropout:
             model.add(Dropout(dropout_rate))
 
-    model.add(Dense(1))
+        for hidden_layer in hidden_layer[1:]:
+            model.add(Dense(hidden_layer,
+                            activation=activation,
+                            bias_initializer=bias_initializer,
+                            kernel_initializer=kernel_initializer
+                            ))
+            if batch_normalization:
+                model.add(BatchNormalization())
+            if dropout:
+                model.add(Dropout(dropout_rate))
+
+        model.add(Dense(1))
+    else:
+        model.add(layers.GRU(hidden_layer[0], input_shape=[input_length, input_dim],
+                             activation=activation,
+                             bias_initializer=bias_initializer,
+                             kernel_initializer=kernel_initializer,
+                             bias_regularizer=bias_regularizer,
+                             return_sequences=True
+                             ))
+        if batch_normalization:
+            model.add(BatchNormalization())
+        if dropout:
+            model.add(Dropout(dropout_rate))
+
+        for hidden_layer in hidden_layer[1:]:
+            model.add(layers.GRU(hidden_layer,
+                                 activation=activation,
+                                 bias_initializer=bias_initializer,
+                                 kernel_initializer=kernel_initializer,
+                                 return_sequences=True
+                                 ))
+            if batch_normalization:
+                model.add(BatchNormalization())
+            if dropout:
+                model.add(Dropout(dropout_rate))
+
+        model.add(Dense(1))
+
     model.compile(loss=keras.losses.mse,
                   optimizer=keras.optimizers.Adam())
 
@@ -203,6 +275,8 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Fa
     file_name = get_file_name(param)
     desc = "#{0:2d}".format(case_number)
     df_predictions = pd.DataFrame()
+
+    # 기간설정
 
     for month in tqdm(test_months, desc=desc):
         if control_volatility_regime:
@@ -298,7 +372,8 @@ def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_nor
     # Create a session with the above options specified.
     k.set_session(tf.Session(config=config))
 
-    model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
+    model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization,
+                              minmaxscaling=minmaxscaling)
     # get forward prediction
     forward_predictions = get_predictions(model, x_test)
     codes[PREDICTED_RET_1] = forward_predictions
