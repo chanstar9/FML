@@ -192,6 +192,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
 
         model.add(Dense(1))
     else:
+        last_layer = hidden_layer[-1]
         model.add(layers.GRU(hidden_layer[0], input_shape=[input_length, input_dim],
                              activation=activation,
                              bias_initializer=bias_initializer,
@@ -258,6 +259,10 @@ def get_predictions(model, x_test, actual_y=None):
     predicted_rank = 'predicted_rank'
 
     prediction = model.predict(x_test, verbose=0)
+
+    if len(prediction.shape)==3:
+        prediction = prediction[:,-1,:]
+
     if isinstance(actual_y, pd.DataFrame):
         df_prediction = pd.concat(
             [actual_y,
