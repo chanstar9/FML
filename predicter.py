@@ -18,7 +18,7 @@ if __name__ == '__main__':
             BIAS_INITIALIZER: HE_UNIFORM,
             KERNEL_INITIALIZER: GLOROT_UNIFORM,
             BIAS_REGULARIZER: NONE,
-            HIDDEN_LAYER: DNN8_2,
+            HIDDEN_LAYER: RNN8_2,
             DROPOUT: False,
             DROPOUT_RATE: 0.5},
         quantile=40, model_num=10, method=GEOMETRIC

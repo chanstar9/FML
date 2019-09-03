@@ -74,9 +74,13 @@ def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_colu
             filtering_dataframe = filtering_dataframe[[DATE, CODE]]
             old_set = pd.merge(old_set, filtering_dataframe, on=[DATE, CODE])
 
-        old_set.reset_index(drop=True).to_dataframe().to_hdf(
-            'data/{}.h5'.format(data_name), key='df', format='table', mode='w'
+        # old_set.reset_index(drop=True).to_dataframe().to_hdf(
+        #     'data/{}.h5'.format(data_name), key='df', format='table', mode='w'
+        # )
+        old_set.reset_index(drop=True).to_dataframe().to_csv(
+            'data/{}.csv'.format(data_name)
         )
+
     else:
         # recent data
         recent_set = get_data_set(portfolio, rolling_columns, dummy_columns, return_y=False)
@@ -88,8 +92,11 @@ def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_colu
             filtering_dataframe = filtering_dataframe[[DATE, CODE]]
             recent_set = pd.merge(recent_set, filtering_dataframe, on=[DATE, CODE])
 
-        recent_set.reset_index(drop=True).to_dataframe().to_hdf(
-            'data/{}_recent.h5'.format(data_name), key='df', format='table', mode='w'
+        # recent_set.reset_index(drop=True).to_dataframe().to_hdf(
+        #     'data/{}_recent.h5'.format(data_name), key='df', format='table', mode='w'
+        # )
+        recent_set.reset_index(drop=True).to_dataframe().to_csv(
+            'data/{}_recent.csv'.format(data_name)
         )
 
 

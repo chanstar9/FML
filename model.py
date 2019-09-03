@@ -6,6 +6,7 @@
 import gc
 from datetime import datetime
 from pathlib import Path
+import torch
 
 import keras
 import tensorflow as tf
@@ -38,7 +39,7 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
     training_set = get_data_set(data_set_key)
     test_set = get_data_set(data_set_key)
 
-    if network_architecture=='rnn':
+    if network_architecture == 'rnn':
         base_columns = [col for col in training_set.columns if '_t-' not in col]
         factor_columns = [col for col in training_set.columns if '_t-0' in col]
 
@@ -53,20 +54,99 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
         test_index = len(months)
     assert test_index - TRAINING_MONTHS - 1 >= 0, "test_month is too early"
 
-    if network_architecture!='rnn':
+    if network_architecture != 'rnn':
         train_start_month = months[test_index - TRAINING_MONTHS - 1]
     else:
-        train_start_month = months[max(test_index - TRAINING_MONTHS - 12 - 1,0)]
+        train_start_month = months[max(test_index - TRAINING_MONTHS - 12 - 1, 0)]
     test_start_month = months[test_index - 12]
 
-
     training_set = training_set.loc[(training_set[DATE] >= train_start_month) & (training_set[DATE] < test_month), :]
-    if network_architecture!='rnn':
+    if network_architecture != 'rnn':
         test_set = test_set.loc[test_set[DATE] == test_month, :]
     else:
         test_set = test_set.loc[(test_set[DATE] >= test_start_month) & (test_set[DATE] <= test_month), :]
 
     return training_set, test_set
+
+
+from torch import nn
+import math
+import torch
+
+class torch_DNN_noisy_net(nn.Linear):
+    def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
+        super(torch_DNN_noisy_net, self).__init__(in_features, out_features, bias=True)
+        self.sigma_weight = nn.Parameter(torch.full((out_features, in_features), sigma_init))
+        self.register_buffer("epsilon_weight", torch.zeros(out_features, in_features))
+
+        if bias:
+            self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
+            self.register_buffer("epsilon_bias", torch.zeros(out_features))
+            self.reset_parameters()
+
+    def reset_parameters(self):
+        std = math.sqrt(3 / self.in_features)
+        self.weight.data.uniform_(-std, std)
+        self.bias.data.uniform_(-std, std)
+
+    def forward(self, input):
+        self.epsilon_weight.normal_()
+        bias = self.bias
+        if bias is not None:
+            self.epsilon_bias.normal_()
+            bias = bias + self.sigma_bias * self.epsilon_bias
+        return F.linear(input, self.weight + self.sigma_weight * self.epsilon_weight, bias)
+
+
+import torch.nn.functional as F
+
+
+class NoisyFactorizedLinear(nn.Linear):
+    def __init__(self, in_features, out_features, sigma_zero=0.4, bias=True):
+        super(NoisyFactorizedLinear, self).__init__(in_features, out_features, bias=True)
+
+        sigma_init = sigma_zero / math.sqrt(in_features)
+        self.sigma_weight = nn.Parameter(torch.full((out_features, in_features), sigma_init))
+        self.register_buffer("epsilon_input", torch.zeros(1, in_features))
+        self.register_buffer("epslion_output", torch.zeros(out_features, 1))
+
+        if bias:
+            self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
+
+    def forward(self, input):
+        self.epsilon_input.normal_()
+        self.epsilon_output.normal_()
+
+        func = lambda x: torch.sign(x) * torch.sqrt(torch.abs(x))
+        eps_in = func(self.epsilon_input)
+        eps_out = func(self.epsilon_output)
+
+        bias = self.bias
+        if bias is not None:
+            bias = bias + self.sigma_bias * eps_out.t()
+            noise_v = torch.mul(eps_in, eps_out)
+            return F.linear(input, self.weight + self.sigma_weight * noise_v, bias)
+
+
+class NoisyDNN(nn.Module):
+    def __init__(self, num_features, output_shape):
+        super(NoisyDNN, self).__init__()
+
+        self.dnn = nn.Sequential(
+            nn.Linear(num_features, 64),
+            nn.ReLU(),
+            torch_DNN_noisy_net(64, 128),
+            nn.ReLU(),
+            nn.Linear(128, 32),
+            nn.ReLU(),
+            torch_DNN_noisy_net(32, 4),
+            nn.ReLU(),
+            nn.Linear(4, 1),
+            nn.ReLU()
+        )
+
+    def forward(self, x):
+        return self.dnn(x)
 
 
 def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
@@ -76,7 +156,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         network_architecture = None
 
     data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month,
-                                                network_architecture = network_architecture
+                                                network_architecture=network_architecture
                                                 )
 
     if network_architecture != 'rnn':
@@ -110,7 +190,6 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
             for i in range(_data.shape[0] - 13 + 1):
                 _temp_train_list.append(_data[i:i + 13])
 
-
         data_train_array = np.array(_temp_train_list)
 
         data_test_rnn = data_test.set_index(CODE)
@@ -126,7 +205,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         y_train = data_train_array[:, :, 2:3]
         x_test = data_test_array[:, :, 3:]
 
-        _actual_test = data_test_rnn[data_test_rnn[DATE]==month]
+        _actual_test = data_test_rnn[data_test_rnn[DATE] == month]
 
         actual_test = _actual_test.loc[_code_list_final, [DATE, RET_1]].reset_index()
 
@@ -165,51 +244,38 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
 
     model = Sequential()
 
-    # input node
-
-    if network_architecture != 'rnn':
-        model.add(Dense(hidden_layer[0], input_dim=input_dim,
-                        activation=activation,
-                        bias_initializer=bias_initializer,
-                        kernel_initializer=kernel_initializer,
-                        bias_regularizer=bias_regularizer
-                        ))
-        if batch_normalization:
-            model.add(BatchNormalization())
-        if dropout:
-            model.add(Dropout(dropout_rate))
-
-        for hidden_layer in hidden_layer[1:]:
-            model.add(Dense(hidden_layer,
+    if 'torch' not in param[HIDDEN_LAYER].lower():
+        if network_architecture != 'rnn':
+            model.add(Dense(hidden_layer[0], input_dim=input_dim,
                             activation=activation,
                             bias_initializer=bias_initializer,
-                            kernel_initializer=kernel_initializer
+                            kernel_initializer=kernel_initializer,
+                            bias_regularizer=bias_regularizer
                             ))
             if batch_normalization:
                 model.add(BatchNormalization())
             if dropout:
                 model.add(Dropout(dropout_rate))
 
-        model.add(Dense(1))
-    else:
-        last_layer = hidden_layer[-1]
-        model.add(layers.GRU(hidden_layer[0], input_shape=[input_length, input_dim],
-                             activation=activation,
-                             bias_initializer=bias_initializer,
-                             kernel_initializer=kernel_initializer,
-                             bias_regularizer=bias_regularizer,
-                             return_sequences=True
-                             ))
-        if batch_normalization:
-            model.add(BatchNormalization())
-        if dropout:
-            model.add(Dropout(dropout_rate))
+            for hidden_layer in hidden_layer[1:]:
+                model.add(Dense(hidden_layer,
+                                activation=activation,
+                                bias_initializer=bias_initializer,
+                                kernel_initializer=kernel_initializer
+                                ))
+                if batch_normalization:
+                    model.add(BatchNormalization())
+                if dropout:
+                    model.add(Dropout(dropout_rate))
 
-        for hidden_layer in hidden_layer[1:]:
-            model.add(layers.GRU(hidden_layer,
+            model.add(Dense(1))
+        else:
+            last_layer = hidden_layer[-1]
+            model.add(layers.GRU(hidden_layer[0], input_shape=[input_length, input_dim],
                                  activation=activation,
                                  bias_initializer=bias_initializer,
                                  kernel_initializer=kernel_initializer,
+                                 bias_regularizer=bias_regularizer,
                                  return_sequences=True
                                  ))
             if batch_normalization:
@@ -217,23 +283,38 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
             if dropout:
                 model.add(Dropout(dropout_rate))
 
-        model.add(Dense(1))
+            for hidden_layer in hidden_layer[1:]:
+                model.add(layers.GRU(hidden_layer,
+                                     activation=activation,
+                                     bias_initializer=bias_initializer,
+                                     kernel_initializer=kernel_initializer,
+                                     return_sequences=True
+                                     ))
+                if batch_normalization:
+                    model.add(BatchNormalization())
+                if dropout:
+                    model.add(Dropout(dropout_rate))
 
-    model.compile(loss=keras.losses.mse,
-                  optimizer=keras.optimizers.Adam())
+            model.add(Dense(1))
 
-    if early_stop:
-        model.fit(x_train, y_train,
-                  batch_size=batch_size,
-                  epochs=epochs,
-                  verbose=0,
-                  callbacks=[EarlyStopping(patience=10)],
-                  validation_split=0.2)
+        model.compile(loss=keras.losses.mse,
+                      optimizer=keras.optimizers.Adam())
+
+        if early_stop:
+            model.fit(x_train, y_train,
+                      batch_size=batch_size,
+                      epochs=epochs,
+                      verbose=0,
+                      callbacks=[EarlyStopping(patience=10)],
+                      validation_split=0.2)
+        else:
+            model.fit(x_train, y_train,
+                      batch_size=batch_size,
+                      epochs=epochs,
+                      verbose=0)
+
     else:
-        model.fit(x_train, y_train,
-                  batch_size=batch_size,
-                  epochs=epochs,
-                  verbose=0)
+        pass
 
     return model, x_test, actual_test
 
@@ -260,8 +341,8 @@ def get_predictions(model, x_test, actual_y=None):
 
     prediction = model.predict(x_test, verbose=0)
 
-    if len(prediction.shape)==3:
-        prediction = prediction[:,-1,:]
+    if len(prediction.shape) == 3:
+        prediction = prediction[:, -1, :]
 
     if isinstance(actual_y, pd.DataFrame):
         df_prediction = pd.concat(
@@ -335,12 +416,19 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Fa
             if not execution:
                 continue
 
-        model, x_test, y_test = train_model(month, param, early_stop=early_stop,
-                                            batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
+        if 'torch' not in param[HIDDEN_LAYER].lower():
+            model, x_test, y_test = train_model(month, param, early_stop=early_stop,
+                                                batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
 
-        df_prediction = get_predictions(model, x_test, y_test)
-        df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
-        gc.collect()
+            df_prediction = get_predictions(model, x_test, y_test)
+            df_predictions = pd.concat([df_predictions, df_prediction], axis=0, ignore_index=True)
+            gc.collect()
+
+            # Clean up the memory
+            k.clear_session()
+        else:
+            model, x_test, y_test = train_model(month, param, early_stop=early_stop,
+                                                batch_normalization=batch_normalization, minmaxscaling=minmaxscaling)
 
     # If a directory for this model does not exist, make it.
     data_dir = 'prediction/{}'.format(file_name)
@@ -357,10 +445,13 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Fa
         index=False
     )
 
-    # Clean up the memory
-    k.get_session().close()
-    k.clear_session()
-    tf.reset_default_graph()
+    if 'torch' not in param[HIDDEN_LAYER].lower():
+        # # Clean up the memory
+        k.get_session().close()
+        k.clear_session()
+        tf.reset_default_graph()
+    else:
+        pass
 
 
 # noinspection PyUnresolvedReferences
@@ -368,7 +459,11 @@ def get_forward_predict(param, quantile, model_num, method):
     print("Param: {}".format(param))
 
     recent_data_set = param[DATA_SET] + '_recent'
-    x_test = pd.read_hdf('data/{}.h5'.format(recent_data_set))
+    # x_test = pd.read_hdf('data/{}.h5'.format(recent_data_set))
+
+    x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
+    unnamed_list = [col for col in x_test.columns if 'Unnamed:' in col]
+    x_test.drop(columns=unnamed_list, inplace=True)
 
     month = x_test[DATE].iloc[0]
     codes = x_test[[CODE]]
@@ -399,25 +494,28 @@ def get_forward_predict(param, quantile, model_num, method):
 
 
 def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_normalization=True, minmaxscaling=False):
-    tf.logging.set_verbosity(3)
-    # TensorFlow wizardry
-    config = tf.ConfigProto()
-    # Don't pre-allocate memory; allocate as-needed
-    config.gpu_options.allow_growth = True
-    # Create a session with the above options specified.
-    k.set_session(tf.Session(config=config))
+    if 'torch' not in param[HIDDEN_LAYER].lower():
+        tf.logging.set_verbosity(3)
+        # TensorFlow wizardry
+        config = tf.ConfigProto()
+        # Don't pre-allocate memory; allocate as-needed
+        config.gpu_options.allow_growth = True
+        # Create a session with the above options specified.
+        k.set_session(tf.Session(config=config))
 
-    model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization,
-                              minmaxscaling=minmaxscaling)
-    # get forward prediction
-    forward_predictions = get_predictions(model, x_test)
-    codes[PREDICTED_RET_1] = forward_predictions
-    df_forward_predictions = codes
-    df_forward_predictions[DATE] = month
+        model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization,
+                                  minmaxscaling=minmaxscaling)
+        # get forward prediction
+        forward_predictions = get_predictions(model, x_test)
+        codes[PREDICTED_RET_1] = forward_predictions
+        df_forward_predictions = codes
+        df_forward_predictions[DATE] = month
 
-    # Clean up the memory
-    k.get_session().close()
-    k.clear_session()
-    tf.reset_default_graph()
+        # Clean up the memory
+        k.get_session().close()
+        k.clear_session()
+        tf.reset_default_graph()
+    else:
+        print('torch would be loaded !')
 
     return df_forward_predictions

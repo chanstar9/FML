@@ -56,6 +56,8 @@ DNN8_4 = 'DNN8_4'
 
 RNN8_2 = 'RNN8_2'
 
+DNN_noisy_net_torch = 'DNN_noisy_net_torch'
+
 class LazyDict(dict):
 
     def __getitem__(self, item):
@@ -64,7 +66,10 @@ class LazyDict(dict):
 
 
 def get_data(data_name):
-    data = pd.read_hdf('data/{}.h5'.format(data_name))
+    # data = pd.read_hdf('data/{}.h5'.format(data_name))
+    data = pd.read_csv('data/{}.csv'.format(data_name))
+    unnamed_list = [col for col in data.columns if 'Unnamed:' in col]
+    data.drop(columns=unnamed_list, inplace=True)
     data[DATE] = pd.to_datetime(data[DATE])
     return data
 
@@ -130,7 +135,9 @@ hidden_layers = {
     DNN8_2: [100, 100, 70, 70, 50, 50],
     DNN8_3: [120, 120, 70, 70, 20, 20],
     DNN8_4: [120, 120, 80, 80, 40, 40],
-    RNN8_2: [100, 100, 70, 70, 50, 50]
+    RNN8_2: [64, 16, 2],
+
+    DNN_noisy_net_torch: [128, 32, 4]
 }
 
 
