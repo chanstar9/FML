@@ -22,6 +22,8 @@ from keras import layers
 from ensemble import GET_ENSEMBLE_PREDICTIONS, PREDICTED_RET_1
 from settings import *
 
+from pandas.tseries.offsets import MonthEnd
+
 TRAINING_MONTHS = 36  # After 36 months training, test 1 month.
 
 TRAIN_START_DATE = (
@@ -34,6 +36,36 @@ months = sorted(pf[DATE].unique())[:-1]
 
 result_columns = [RET_1]
 
+def get_rnn_predicting_set(x_test_for_rnn2, month):
+    base_columns = [col for col in x_test_for_rnn2.columns if '_t-' not in col]
+    factor_columns = [col for col in x_test_for_rnn2.columns if '_t-0' in col]
+
+    rnn_columns = base_columns + sorted(factor_columns)
+    x_test_for_rnn2 = x_test_for_rnn2[rnn_columns].copy(deep=True)
+
+    rnn_predict_start_month = pd.Timestamp(month) - MonthEnd(12)
+    rnn_predict_start_month = rnn_predict_start_month.strftime('%Y-%m-%d')
+
+    x_test_for_rnn3 = x_test_for_rnn2[x_test_for_rnn2[DATE] >= rnn_predict_start_month].copy(deep=True)
+
+    x_test_for_rnn3.sort_values([CODE, DATE], inplace=True)
+    x_test_for_rnn3.reset_index(inplace=True, drop=True)
+
+    # here, we don't have RET_1, hence it start from 2:.
+
+    predicting_firms_list = []
+    for _code, _data in x_test_for_rnn3.groupby(CODE):
+        if _data.shape[0]==13:
+            predicting_firms_list.append(_data.values)
+
+
+    x_prediction = np.array(predicting_firms_list)
+    codes = pd.DataFrame(x_prediction[:,0,1].reshape(-1,1), columns=[CODE])
+    x_prediction = x_prediction[:,:,2:]
+
+    return codes, x_prediction
+
+
 
 def get_train_test_set(data_set_key, test_month, network_architecture):
     training_set = get_data_set(data_set_key)
@@ -43,7 +75,7 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
         base_columns = [col for col in training_set.columns if '_t-' not in col]
         factor_columns = [col for col in training_set.columns if '_t-0' in col]
 
-        rnn_columns = base_columns + factor_columns
+        rnn_columns = base_columns + sorted(factor_columns)
 
         training_set = training_set[rnn_columns]
         test_set = test_set[rnn_columns]
@@ -64,7 +96,10 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
     if network_architecture != 'rnn':
         test_set = test_set.loc[test_set[DATE] == test_month, :]
     else:
-        test_set = test_set.loc[(test_set[DATE] >= test_start_month) & (test_set[DATE] <= test_month), :]
+        if test_month not in months:
+            test_set = test_set.loc[test_set[DATE] == test_month, :]
+        else:
+            test_set = test_set.loc[(test_set[DATE] >= test_start_month) & (test_set[DATE] <= test_month), :]
 
     return training_set, test_set
 
@@ -170,19 +205,30 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     else:
         _full_list = dict()
         _code_list = []
+
+        data_trains.sort_values([CODE, DATE], inplace=True)
+        data_test.sort_values([CODE, DATE], inplace=True)
+
+        data_trains.reset_index(inplace=True, drop=True)
+        data_test.reset_index(inplace=True, drop=True)
+
+
         for _code, _data in data_trains.groupby(CODE):
             if _data.shape[0] >= 13:
                 _full_list[_code] = _data.values
                 _code_list.append(_code)
 
-        _full_list_test = dict()
-        _code_list_test = []
-        for _code, _data in data_test.groupby(CODE):
-            if _data.shape[0] == 13:
-                _full_list_test[_code] = _data.values
-                _code_list_test.append(_code)
+        if data_test.shape[0]>0:
+            _full_list_test = dict()
+            _code_list_test = []
+            for _code, _data in data_test.groupby(CODE):
+                if _data.shape[0] == 13:
+                    _full_list_test[_code] = _data.values
+                    _code_list_test.append(_code)
 
-        _code_list_final = list(set(_code_list).intersection(set(_code_list_test)))
+            _code_list_final = list(set(_code_list).intersection(set(_code_list_test)))
+        else:
+            _code_list_final = _code_list
 
         _temp_train_list = []
         for _code in _code_list_final:
@@ -193,21 +239,30 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         data_train_array = np.array(_temp_train_list)
 
         data_test_rnn = data_test.set_index(CODE)
-        data_test_array_pandas = data_test_rnn.loc[_code_list_final, :].reset_index()
+        # data_test_array_pandas = data_test_rnn.loc[_code_list_final, :].reset_index()
 
-        _temp_test_list = []
-        for _code in _code_list_final:
-            _data = _full_list_test[_code]
-            _temp_test_list.append(_data)
-        data_test_array = np.array(_temp_test_list)
+        if data_test.shape[0] > 0:
+            _temp_test_list = []
+            for _code in _code_list_final:
+                _data = _full_list_test[_code]
+                _temp_test_list.append(_data)
+            data_test_array = np.array(_temp_test_list)
+        else:
+            data_test_array = data_test.values
 
         x_train = data_train_array[:, :, 3:]
         y_train = data_train_array[:, :, 2:3]
-        x_test = data_test_array[:, :, 3:]
 
-        _actual_test = data_test_rnn[data_test_rnn[DATE] == month]
+        if data_test.shape[0] > 0:
+            x_test = data_test_array[:, :, 3:]
+            _actual_test = data_test_rnn[data_test_rnn[DATE] == month]
 
-        actual_test = _actual_test.loc[_code_list_final, [DATE, RET_1]].reset_index()
+            actual_test = _actual_test.loc[_code_list_final, [DATE, RET_1]].reset_index()
+        else:
+            x_test = None
+            actual_test = None
+
+
 
         input_length = x_train.shape[1]
 
@@ -456,18 +511,37 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Fa
 
 # noinspection PyUnresolvedReferences
 def get_forward_predict(param, quantile, model_num, method):
+
+    if 'rnn' in param[HIDDEN_LAYER].lower():
+        network_architecture = 'rnn'
+    else:
+        network_architecture = None
+
     print("Param: {}".format(param))
 
     recent_data_set = param[DATA_SET] + '_recent'
     # x_test = pd.read_hdf('data/{}.h5'.format(recent_data_set))
 
-    x_test = pd.read_csv('data/{}.csv'.format(recent_data_set))
+    x_test = pd.read_pickle('data/{}.pck'.format(recent_data_set))
     unnamed_list = [col for col in x_test.columns if 'Unnamed:' in col]
     x_test.drop(columns=unnamed_list, inplace=True)
+
+    x_test_for_rnn = x_test.copy(deep=True)
 
     month = x_test[DATE].iloc[0]
     codes = x_test[[CODE]]
     x_test = x_test.drop([DATE, CODE], axis=1)
+
+    if network_architecture == 'rnn':
+        x_test_prev = pd.read_pickle('data/{}.pck'.format(param[DATA_SET]))
+        unnamed_list = [col for col in x_test_prev.columns if 'Unnamed:' in col]
+        x_test_prev.drop(columns=unnamed_list, inplace=True)
+        x_test_prev.drop(columns=[RET_1], inplace=True)
+
+        x_test_for_rnn2 = pd.concat([x_test_for_rnn, x_test_prev], axis=0)
+
+        codes, x_prediction = get_rnn_predicting_set(x_test_for_rnn2, month)
+
 
     with Pool(min(os.cpu_count(), model_num)) as p:
         # noinspection PyTypeChecker
@@ -476,6 +550,7 @@ def get_forward_predict(param, quantile, model_num, method):
             [month for _ in range(model_num)],
             [param for _ in range(model_num)],
             [x_test for _ in range(model_num)],
+            [x_prediction for _ in range(model_num)]
         )]
         for r in results:
             r.wait()
@@ -493,7 +568,13 @@ def get_forward_predict(param, quantile, model_num, method):
         ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
 
 
-def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_normalization=True, minmaxscaling=False):
+def _get_forward_predict(codes, month, param, x_test, x_prediction, early_stop=True, batch_normalization=True, minmaxscaling=False):
+
+    if 'rnn' in param[HIDDEN_LAYER].lower():
+        network_architecture = 'rnn'
+    else:
+        network_architecture = None
+
     if 'torch' not in param[HIDDEN_LAYER].lower():
         tf.logging.set_verbosity(3)
         # TensorFlow wizardry
@@ -506,9 +587,14 @@ def _get_forward_predict(codes, month, param, x_test, early_stop=True, batch_nor
         model, _, _ = train_model(month, param, early_stop=early_stop, batch_normalization=batch_normalization,
                                   minmaxscaling=minmaxscaling)
         # get forward prediction
-        forward_predictions = get_predictions(model, x_test)
+
+        if network_architecture != 'rnn':
+            forward_predictions = get_predictions(model, x_test)
+        else:
+            forward_predictions = get_predictions(model, x_prediction)
+
         codes[PREDICTED_RET_1] = forward_predictions
-        df_forward_predictions = codes
+        df_forward_predictions = codes.copy(deep=True)
         df_forward_predictions[DATE] = month
 
         # Clean up the memory

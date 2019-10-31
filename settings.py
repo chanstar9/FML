@@ -67,7 +67,7 @@ class LazyDict(dict):
 
 def get_data(data_name):
     # data = pd.read_hdf('data/{}.h5'.format(data_name))
-    data = pd.read_csv('data/{}.csv'.format(data_name))
+    data = pd.read_pickle('data/{}.pck'.format(data_name))
     unnamed_list = [col for col in data.columns if 'Unnamed:' in col]
     data.drop(columns=unnamed_list, inplace=True)
     data[DATE] = pd.to_datetime(data[DATE])

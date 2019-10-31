@@ -223,7 +223,7 @@ def save_concepts(old_data: bool):
 
 
 if __name__ == '__main__':
-    old_data = True
+    old_data = False
     # save_concepts(old_data=old_data)
     save_all(old_data)
     # with Pool(os.cpu_count()) as p:

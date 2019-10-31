@@ -8,6 +8,8 @@ from ensemble import INTERSECTION, GEOMETRIC, ARITHMETIC
 from model import *
 from settings import *
 
+NET_INCOME_FILTER = 'net_income_filter'
+
 if __name__ == '__main__':
     get_forward_predict(
         param={
@@ -20,6 +22,8 @@ if __name__ == '__main__':
             BIAS_REGULARIZER: NONE,
             HIDDEN_LAYER: RNN8_2,
             DROPOUT: False,
-            DROPOUT_RATE: 0.5},
+            DROPOUT_RATE: 0.5,
+            NET_INCOME_FILTER: True},
         quantile=40, model_num=10, method=GEOMETRIC
     )
+
