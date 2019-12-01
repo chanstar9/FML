@@ -145,6 +145,10 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
 data_trains, data_test = get_train_test_set(data_set_key=param[DATA_SET], test_month=month,
                                             network_architecture=network_architecture
                                             )
+if param[NET_INCOME_FILTER]:
+    data_trains = data_trains[data_trains['e_p_t-0']>=0].copy(deep=True)
+    data_test = data_test[data_test['e_p_t-0'] >= 0].copy(deep=True)
+
 
 _full_list = dict()
 _code_list = []

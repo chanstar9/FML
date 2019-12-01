@@ -9,6 +9,10 @@ from keras.regularizers import l1, l2, l1_l2
 
 from data_generator import *
 
+
+VERBOSE = 'verbose'
+NET_INCOME_FILTER = 'net_income_filter'
+
 DATA_SET = 'data_set'
 BATCH_SIZE = 'batch_size'
 EPOCHS = 'epochs'
@@ -22,7 +26,8 @@ DROPOUT_RATE = 'dropout_rate'
 
 # ACTIVATION
 LINEAR = 'linear'
-TAHN = 'tahn'
+# TAHN = 'tahn'
+TANH = 'tanh'
 RELU = 'relu'
 
 # INITIALIZER
@@ -101,7 +106,7 @@ data_sets = LazyDict(_data_sets)
 
 activations = {
     LINEAR: linear,
-    TAHN: tanh,
+    TANH: tanh,
     RELU: relu
 }
 

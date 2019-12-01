@@ -36,6 +36,7 @@ months = sorted(pf[DATE].unique())[:-1]
 
 result_columns = [RET_1]
 
+
 def get_rnn_predicting_set(x_test_for_rnn2, month):
     base_columns = [col for col in x_test_for_rnn2.columns if '_t-' not in col]
     factor_columns = [col for col in x_test_for_rnn2.columns if '_t-0' in col]
@@ -48,6 +49,8 @@ def get_rnn_predicting_set(x_test_for_rnn2, month):
 
     x_test_for_rnn3 = x_test_for_rnn2[x_test_for_rnn2[DATE] >= rnn_predict_start_month].copy(deep=True)
 
+    print(x_test_for_rnn3['date'].min(), x_test_for_rnn3['date'].max())
+
     x_test_for_rnn3.sort_values([CODE, DATE], inplace=True)
     x_test_for_rnn3.reset_index(inplace=True, drop=True)
 
@@ -55,16 +58,14 @@ def get_rnn_predicting_set(x_test_for_rnn2, month):
 
     predicting_firms_list = []
     for _code, _data in x_test_for_rnn3.groupby(CODE):
-        if _data.shape[0]==13:
+        if _data.shape[0] == 13:
             predicting_firms_list.append(_data.values)
 
-
     x_prediction = np.array(predicting_firms_list)
-    codes = pd.DataFrame(x_prediction[:,0,1].reshape(-1,1), columns=[CODE])
-    x_prediction = x_prediction[:,:,2:]
+    codes = pd.DataFrame(x_prediction[:, 0, 1].reshape(-1, 1), columns=[CODE])
+    x_prediction = x_prediction[:, :, 2:]
 
     return codes, x_prediction
-
 
 
 def get_train_test_set(data_set_key, test_month, network_architecture):
@@ -107,6 +108,7 @@ def get_train_test_set(data_set_key, test_month, network_architecture):
 from torch import nn
 import math
 import torch
+
 
 class torch_DNN_noisy_net(nn.Linear):
     def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
@@ -194,6 +196,10 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
                                                 network_architecture=network_architecture
                                                 )
 
+    if param[NET_INCOME_FILTER]:
+        data_trains = data_trains[data_trains['e_p_t-0'] >= 0].copy(deep=True)
+        data_test = data_test[data_test['e_p_t-0'] >= 0].copy(deep=True)
+
     if network_architecture != 'rnn':
         data_train_array = data_trains.values
         data_test_array = data_test.values
@@ -212,13 +218,12 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         data_trains.reset_index(inplace=True, drop=True)
         data_test.reset_index(inplace=True, drop=True)
 
-
         for _code, _data in data_trains.groupby(CODE):
             if _data.shape[0] >= 13:
                 _full_list[_code] = _data.values
                 _code_list.append(_code)
 
-        if data_test.shape[0]>0:
+        if data_test.shape[0] > 0:
             _full_list_test = dict()
             _code_list_test = []
             for _code, _data in data_test.groupby(CODE):
@@ -262,8 +267,6 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
             x_test = None
             actual_test = None
 
-
-
         input_length = x_train.shape[1]
 
     # MinMaxScaling
@@ -302,7 +305,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
     if 'torch' not in param[HIDDEN_LAYER].lower():
         if network_architecture != 'rnn':
             model.add(Dense(hidden_layer[0], input_dim=input_dim,
-                            activation=activation,
+                            activation=TANH,
                             bias_initializer=bias_initializer,
                             kernel_initializer=kernel_initializer,
                             bias_regularizer=bias_regularizer
@@ -327,7 +330,7 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
         else:
             last_layer = hidden_layer[-1]
             model.add(layers.GRU(hidden_layer[0], input_shape=[input_length, input_dim],
-                                 activation=activation,
+                                 activation=TANH,
                                  bias_initializer=bias_initializer,
                                  kernel_initializer=kernel_initializer,
                                  bias_regularizer=bias_regularizer,
@@ -359,14 +362,14 @@ def train_model(month, param, early_stop, batch_normalization, minmaxscaling):
             model.fit(x_train, y_train,
                       batch_size=batch_size,
                       epochs=epochs,
-                      verbose=0,
+                      verbose=param[VERBOSE],
                       callbacks=[EarlyStopping(patience=10)],
                       validation_split=0.2)
         else:
             model.fit(x_train, y_train,
                       batch_size=batch_size,
                       epochs=epochs,
-                      verbose=0)
+                      verbose=param[VERBOSE])
 
     else:
         pass
@@ -511,7 +514,6 @@ def _backtest(case_number: int, param: dict, test_months: list, minmaxscaling=Fa
 
 # noinspection PyUnresolvedReferences
 def get_forward_predict(param, quantile, model_num, method):
-
     if 'rnn' in param[HIDDEN_LAYER].lower():
         network_architecture = 'rnn'
     else:
@@ -543,6 +545,9 @@ def get_forward_predict(param, quantile, model_num, method):
         codes, x_prediction = get_rnn_predicting_set(x_test_for_rnn2, month)
 
 
+    else:
+        x_prediction = None
+
     with Pool(min(os.cpu_count(), model_num)) as p:
         # noinspection PyTypeChecker
         results = [p.apply_async(_get_forward_predict, t) for t in zip(
@@ -564,12 +569,18 @@ def get_forward_predict(param, quantile, model_num, method):
 
         ensemble_predictions = ensemble_predictions[-1][CODE]
 
+        # Matching with firm names
+
         # Save predictions
         ensemble_predictions.to_csv('forward_predict/forward_predictions.csv', index=False)
+        time_of_saving = datetime.now().strftime('%Y%m%d-%H%M%S')
+        ensemble_predictions.to_csv('forward_predict/forward_predictions_{}.csv'.format(time_of_saving), index=False)
+
+    return time_of_saving
 
 
-def _get_forward_predict(codes, month, param, x_test, x_prediction, early_stop=True, batch_normalization=True, minmaxscaling=False):
-
+def _get_forward_predict(codes, month, param, x_test, x_prediction, early_stop=True, batch_normalization=True,
+                         minmaxscaling=False):
     if 'rnn' in param[HIDDEN_LAYER].lower():
         network_architecture = 'rnn'
     else:
@@ -603,5 +614,7 @@ def _get_forward_predict(codes, month, param, x_test, x_prediction, early_stop=T
         tf.reset_default_graph()
     else:
         print('torch would be loaded !')
+
+    print('done')
 
     return df_forward_predictions

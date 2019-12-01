@@ -45,7 +45,8 @@ def get_data_set(portfolio, rolling_columns, dummy_columns=None, return_y=True):
             if i == 0:
                 data_set[column_i] = data_set[column]
             else:
-                data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(drop=True)
+                data_set[column_i] = data_set.groupby(by=[CODE]).apply(lambda x: x[column].shift(i)).reset_index(
+                    drop=True)
             print(column_i)
 
     if dummy_columns is not None:
@@ -103,6 +104,7 @@ def save_data(old_data: bool, portfolio: Portfolio, data_name: str, rolling_colu
 def save_all(old_data: bool):
     columns = [DATE, CODE, RET_1]
     rolling_columns = [
+        SIZE,
         E_P, B_P, S_P, C_P, OP_P, GP_P, ROA, ROE, QROA, QROE, GP_A, ROIC, GP_S, SALESQOQ, GPQOQ, ROAQOQ,
         MOM6, MOM12, BETA_1D, VOL_5M, LIQ_RATIO, EQUITY_RATIO, DEBT_RATIO, FOREIGN_OWNERSHIP_RATIO,
         TERM_SPREAD_KOR, TERM_SPREAD_US, CREDIT_SPREAD_KOR, LOG_USD2KRW, LOG_CHY2KRW, LOG_EURO2KRW,
@@ -223,16 +225,12 @@ def save_concepts(old_data: bool):
 
 
 if __name__ == '__main__':
-    old_data = False
-    # save_concepts(old_data=old_data)
+    old_data = True
     save_all(old_data)
-    # with Pool(os.cpu_count()) as p:
-    #     results = [p.apply_async(func, [old_data]) for func in [
-    #         save_all,
-    #         save_macro,
-    #         save_sector
-    #     ]]
-    #     for result in results:
-    #         result.wait()
-    #     p.close()
-    #     p.join()
+    pd.read_csv('data/all.csv').to_pickle('data/all.pck')
+    print(old_data)
+
+    old_data = False
+    save_all(old_data)
+    pd.read_csv('data/all_recent.csv').to_pickle('data/all_recent.pck')
+    print(old_data)
