@@ -37,7 +37,7 @@ months = sorted(pf[DATE].unique())[:-1]
 result_columns = [RET_1]
 
 
-def get_rnn_predicting_set(x_test_for_rnn2, month):
+def get_rnn_predicting_set(x_test_for_rnn2, month, param):
     base_columns = [col for col in x_test_for_rnn2.columns if '_t-' not in col]
     factor_columns = [col for col in x_test_for_rnn2.columns if '_t-0' in col]
 
@@ -48,6 +48,9 @@ def get_rnn_predicting_set(x_test_for_rnn2, month):
     rnn_predict_start_month = rnn_predict_start_month.strftime('%Y-%m-%d')
 
     x_test_for_rnn3 = x_test_for_rnn2[x_test_for_rnn2[DATE] >= rnn_predict_start_month].copy(deep=True)
+    if param['net_income_filter_selection']:
+        x_test_for_rnn3 = x_test_for_rnn3[x_test_for_rnn3['e_p_t-0']>0].copy(deep=True)
+        print('shape of test set : ', x_test_for_rnn3.shape)
 
     print(x_test_for_rnn3['date'].min(), x_test_for_rnn3['date'].max())
 
@@ -542,7 +545,7 @@ def get_forward_predict(param, quantile, model_num, method):
 
         x_test_for_rnn2 = pd.concat([x_test_for_rnn, x_test_prev], axis=0)
 
-        codes, x_prediction = get_rnn_predicting_set(x_test_for_rnn2, month)
+        codes, x_prediction = get_rnn_predicting_set(x_test_for_rnn2, month, param)
 
 
     else:
